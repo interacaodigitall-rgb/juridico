@@ -1,6 +1,9 @@
+
 import { jsPDF } from 'jspdf';
 import { SavedContract, ContractTemplate, FormData, Signatures, ContractType } from '../types';
 import { empresaData } from '../constants';
+import { firestore } from '../firebase';
+
 
 declare global {
     interface Window {
@@ -10,41 +13,44 @@ declare global {
     }
 }
 
-const STORAGE_KEY = 'tvdeContracts';
+// --- Firestore Service ---
 
-// --- Local Storage Service ---
-
-export const loadContractsFromStorage = (): SavedContract[] => {
+export const loadContracts = async (userId: string): Promise<SavedContract[]> => {
     try {
-        const contractsJSON = localStorage.getItem(STORAGE_KEY);
-        if (contractsJSON) {
-            const contracts = JSON.parse(contractsJSON) as SavedContract[];
-            return contracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const contractsRef = firestore.collection('users').doc(userId).collection('contracts');
+        const snapshot = await contractsRef.orderBy('createdAt', 'desc').get();
+        if (snapshot.empty) {
+            return [];
         }
-        return [];
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as SavedContract));
     } catch (error) {
-        console.error('Error loading contracts from localStorage:', error);
+        console.error('Error loading contracts from Firestore:', error);
+        alert('Falha ao carregar contratos. Verifique a sua ligação à Internet.');
         return [];
     }
 };
 
-export const saveContractToStorage = (newContract: SavedContract): void => {
+export const saveContract = async (userId: string, contractData: Omit<SavedContract, 'id'>): Promise<string> => {
     try {
-        const contracts = loadContractsFromStorage();
-        contracts.unshift(newContract);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(contracts));
+        const contractsRef = firestore.collection('users').doc(userId).collection('contracts');
+        const docRef = await contractsRef.add(contractData);
+        return docRef.id;
     } catch (error) {
-        console.error('Error saving contract to localStorage:', error);
+        console.error('Error saving contract to Firestore:', error);
+        throw new Error('Falha ao guardar o contrato na nuvem.');
     }
 };
 
-export const deleteContractFromStorage = (contractId: number): void => {
+export const deleteContract = async (userId: string, contractId: string): Promise<void> => {
     try {
-        let contracts = loadContractsFromStorage();
-        contracts = contracts.filter(c => c.id !== contractId);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(contracts));
+        const contractRef = firestore.collection('users').doc(userId).collection('contracts').doc(contractId);
+        await contractRef.delete();
     } catch (error) {
-        console.error('Error deleting contract from localStorage:', error);
+        console.error('Error deleting contract from Firestore:', error);
+        throw new Error('Falha ao apagar o contrato.');
     }
 };
 

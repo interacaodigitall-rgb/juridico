@@ -1,16 +1,34 @@
 
 import React from 'react';
 import { SavedContract } from '../types';
-import { downloadPdf } from '../services/contractService';
+import { generateFinalPDF } from '../services/contractService';
+import { contractTemplates } from '../constants';
 
 interface ManageContractsProps {
     contracts: SavedContract[];
-    onDelete: (id: number) => void;
+    onDelete: (id: string) => void;
     onEdit: (contract: SavedContract) => void;
     onNew: () => void;
 }
 
 const ManageContracts: React.FC<ManageContractsProps> = ({ contracts, onDelete, onEdit, onNew }) => {
+
+    const handleDownload = async (contract: SavedContract) => {
+        const template = contractTemplates[contract.type];
+        if (!template) {
+            alert('Template de contrato não encontrado!');
+            return;
+        }
+        try {
+            alert('A gerar o PDF. O download começará em breve...');
+            await generateFinalPDF(template, contract.data, contract.signatures, contract.type);
+        } catch (error) {
+            console.error("Failed to regenerate PDF:", error);
+            alert("Falha ao gerar o PDF. Tente novamente.");
+        }
+    };
+
+
     return (
         <div className="glass-effect rounded-xl p-8 fade-in">
             <h2 className="text-3xl font-bold mb-8 text-gray-100">Arquivo de Contratos</h2>
@@ -45,7 +63,7 @@ const ManageContracts: React.FC<ManageContractsProps> = ({ contracts, onDelete, 
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z"></path></svg>
                                         <span>Editar</span>
                                     </button>
-                                    <button onClick={() => downloadPdf(contract.pdf, contract.title, contract.data.DATA_ASSINATURA)} className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2">
+                                    <button onClick={() => handleDownload(contract)} className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2">
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                         <span>Baixar</span>
                                     </button>

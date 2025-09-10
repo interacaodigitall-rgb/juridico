@@ -32,11 +32,10 @@ export type FormData = Record<string, string>;
 export type Signatures = Record<string, string>; // signerName -> dataURL
 
 export interface SavedContract {
-    id: number;
+    id: string;
     type: ContractType;
     title: string;
     data: FormData;
     signatures: Signatures;
     createdAt: string;
-    pdf: string;
 }

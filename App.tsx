@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Step, ContractType, FormData, Signatures, SavedContract } from './types';
 import { contractTemplates, empresaData } from './constants';
@@ -7,15 +8,28 @@ import ContractForm from './components/ContractForm';
 import PreviewContract from './components/PreviewContract';
 import SignContract from './components/SignContract';
 import ManageContracts from './components/ManageContracts';
-import GitSyncIndicator from './components/GitSyncIndicator';
+import GitSyncIndicator, { SyncStatus } from './components/GitSyncIndicator';
 import { 
     generateFinalPDF, 
-    loadContractsFromStorage, 
-    saveContractToStorage, 
-    deleteContractFromStorage 
+    loadContracts,
+    saveContract,
+    deleteContract
 } from './services/contractService';
+import { auth } from './firebase';
+import Login from './components/Login';
+import LoadingSpinner from './components/LoadingSpinner';
 
-const Header = () => (
+// FIX: Define a local interface for the user object to resolve TypeScript errors
+// related to the 'firebase' namespace not being found. This ensures type safety
+// for the user object without relying on globally available Firebase types.
+interface FirebaseUser {
+    uid: string;
+    email: string | null;
+}
+
+declare const firebase: any;
+
+const Header = ({ user, onLogout, syncStatus }: { user: FirebaseUser, onLogout: () => void, syncStatus: SyncStatus }) => (
     <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
         <div className="text-center sm:text-left">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
@@ -23,11 +37,21 @@ const Header = () => (
             </h1>
             <p className="text-gray-400 text-lg mt-2">Plataforma Profissional de Gestão Contratual</p>
         </div>
-        <GitSyncIndicator />
+        <div className="flex items-center gap-4">
+            <div className="text-right">
+                <p className="text-sm text-gray-300">{user.email}</p>
+                 <button onClick={onLogout} className="text-xs text-blue-400 hover:underline">Terminar Sessão</button>
+            </div>
+            <GitSyncIndicator status={syncStatus} />
+        </div>
     </div>
 );
 
 const App: React.FC = () => {
+    const [user, setUser] = useState<FirebaseUser | null>(null);
+    const [loadingAuth, setLoadingAuth] = useState(true);
+    const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
+    
     const [step, setStep] = useState<Step>(Step.Select);
     const [completedSteps, setCompletedSteps] = useState<Set<Step>>(new Set([Step.Select]));
     const [contractType, setContractType] = useState<ContractType | null>(null);
@@ -35,8 +59,27 @@ const App: React.FC = () => {
     const [contracts, setContracts] = useState<SavedContract[]>([]);
 
     useEffect(() => {
-        setContracts(loadContractsFromStorage());
+        const unsubscribe = auth.onAuthStateChanged((user: FirebaseUser | null) => {
+            setUser(user);
+            setLoadingAuth(false);
+        });
+        return () => unsubscribe();
     }, []);
+    
+    useEffect(() => {
+        if (user) {
+            setSyncStatus('syncing');
+            loadContracts(user.uid)
+                .then(data => {
+                    setContracts(data);
+                    setSyncStatus('synced');
+                })
+                .catch(() => setSyncStatus('error'));
+        } else {
+            setContracts([]);
+        }
+    }, [user]);
+
 
     const resetProcess = useCallback(() => {
         setStep(Step.Select);
@@ -70,31 +113,41 @@ const App: React.FC = () => {
     };
 
     const handleSignComplete = async (signatures: Signatures) => {
-        if (!contractType) return;
+        if (!contractType || !user) return;
+        setSyncStatus('syncing');
         try {
-            const { pdfDataUri } = await generateFinalPDF(contractTemplates[contractType], formData, signatures, contractType);
-            const newContract: SavedContract = {
-                id: Date.now(),
+            await generateFinalPDF(contractTemplates[contractType], formData, signatures, contractType);
+            const newContract: Omit<SavedContract, 'id'> = {
                 type: contractType,
                 title: contractTemplates[contractType].title,
                 data: formData,
                 signatures,
                 createdAt: new Date().toISOString(),
-                pdf: pdfDataUri
             };
-            saveContractToStorage(newContract);
-            setContracts(loadContractsFromStorage());
-            alert('🎉 Sucesso! Contrato gerado e arquivado.');
+            await saveContract(user.uid, newContract);
+            const updatedContracts = await loadContracts(user.uid);
+            setContracts(updatedContracts);
+            setSyncStatus('synced');
+            alert('🎉 Sucesso! Contrato gerado e arquivado na nuvem.');
             resetProcess();
         } catch (error) {
+            setSyncStatus('error');
             console.error(error);
-            alert(`❌ Erro ao gerar o PDF: ${error instanceof Error ? error.message : String(error)}`);
+            alert(`❌ Erro ao gerar ou guardar o contrato: ${error instanceof Error ? error.message : String(error)}`);
         }
     };
     
-    const handleDeleteContract = (id: number) => {
-        deleteContractFromStorage(id);
-        setContracts(loadContractsFromStorage());
+    const handleDeleteContract = async (id: string) => {
+        if (!user) return;
+        setSyncStatus('syncing');
+        try {
+            await deleteContract(user.uid, id);
+            setContracts(prev => prev.filter(c => c.id !== id));
+            setSyncStatus('synced');
+        } catch(error) {
+            setSyncStatus('error');
+            alert(`❌ Erro ao apagar o contrato: ${error instanceof Error ? error.message : String(error)}`);
+        }
     };
 
     const handleEditContract = (contract: SavedContract) => {
@@ -102,6 +155,10 @@ const App: React.FC = () => {
         setFormData(contract.data);
         setStep(Step.Form);
         setCompletedSteps(new Set([Step.Select, Step.Form, Step.Preview, Step.Sign]));
+    };
+
+    const handleLogout = () => {
+        auth.signOut();
     };
 
     const renderStep = () => {
@@ -124,11 +181,19 @@ const App: React.FC = () => {
         }
     };
 
+    if (loadingAuth) {
+        return <LoadingSpinner />;
+    }
+
+    if (!user) {
+        return <Login />;
+    }
+
     return (
         <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6">
             <style>{`.fade-in { animation: fadeIn 0.5s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .glass-effect { backdrop-filter: blur(16px) saturate(180%); -webkit-backdrop-filter: blur(16px) saturate(180%); background-color: rgba(31, 41, 55, 0.75); border: 1px solid rgba(255, 255, 255, 0.125); }`}</style>
             <div className="container mx-auto px-4 py-6 max-w-7xl">
-                <Header />
+                <Header user={user} onLogout={handleLogout} syncStatus={syncStatus}/>
 
                 <div className="glass-effect rounded-xl p-4 sm:p-6 mb-8">
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
