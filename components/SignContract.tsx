@@ -17,6 +17,21 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, onBack,
     const signers = template.signatures;
     const allSignaturesCollected = currentSignerIndex >= signers.length;
 
+    // Effect to prevent body scrolling while drawing on mobile.
+    useEffect(() => {
+        const originalStyle = document.body.style.overflow;
+        if (isDrawing) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = originalStyle;
+        }
+
+        // Restore original style on cleanup
+        return () => {
+            document.body.style.overflow = originalStyle;
+        };
+    }, [isDrawing]);
+
     const clearCanvas = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -69,9 +84,7 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, onBack,
     }
     
     const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        if ('touches' in e.nativeEvent) {
-            e.preventDefault();
-        }
+        e.preventDefault();
         const { x, y } = getCoords(e.nativeEvent);
         const ctx = canvasRef.current?.getContext('2d');
         if (!ctx) return;
@@ -81,9 +94,7 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, onBack,
     };
 
     const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        if ('touches' in e.nativeEvent) {
-            e.preventDefault();
-        }
+        e.preventDefault();
         if (!isDrawing) return;
         const { x, y } = getCoords(e.nativeEvent);
         const ctx = canvasRef.current?.getContext('2d');
@@ -92,7 +103,8 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, onBack,
         ctx.stroke();
     };
 
-    const stopDrawing = () => {
+    const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         const ctx = canvasRef.current?.getContext('2d');
         if (!ctx) return;
         ctx.closePath();
@@ -132,7 +144,7 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, onBack,
                                 onTouchStart={startDrawing}
                                 onTouchMove={draw}
                                 onTouchEnd={stopDrawing}
-                                className="w-full h-48 rounded-lg cursor-crosshair bg-white"
+                                className="w-full h-64 rounded-lg cursor-crosshair bg-white"
                             />
                             <div className="mt-4 flex space-x-3">
                                 <button onClick={clearCanvas} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300">Limpar</button>

@@ -7,6 +7,7 @@ import ContractForm from './components/ContractForm';
 import PreviewContract from './components/PreviewContract';
 import SignContract from './components/SignContract';
 import ManageContracts from './components/ManageContracts';
+import GitSyncIndicator from './components/GitSyncIndicator';
 import { 
     generateFinalPDF, 
     loadContractsFromStorage, 
@@ -15,11 +16,14 @@ import {
 } from './services/contractService';
 
 const Header = () => (
-    <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-            Sistema Jurídico TVDE
-        </h1>
-        <p className="text-gray-400 text-lg mt-2">Plataforma Profissional de Gestão Contratual</p>
+    <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+        <div className="text-center sm:text-left">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                Sistema Jurídico TVDE
+            </h1>
+            <p className="text-gray-400 text-lg mt-2">Plataforma Profissional de Gestão Contratual</p>
+        </div>
+        <GitSyncIndicator />
     </div>
 );
 
