@@ -1,0 +1,66 @@
+
+import React from 'react';
+import { SavedContract } from '../types';
+import { downloadPdf } from '../services/contractService';
+
+interface ManageContractsProps {
+    contracts: SavedContract[];
+    onDelete: (id: number) => void;
+    onEdit: (contract: SavedContract) => void;
+    onNew: () => void;
+}
+
+const ManageContracts: React.FC<ManageContractsProps> = ({ contracts, onDelete, onEdit, onNew }) => {
+    return (
+        <div className="glass-effect rounded-xl p-8 fade-in">
+            <h2 className="text-3xl font-bold mb-8 text-gray-100">Arquivo de Contratos</h2>
+            {contracts.length === 0 ? (
+                <div className="text-center py-12">
+                    <div className="text-6xl mb-6">📁</div>
+                    <h3 className="text-2xl font-bold text-gray-300 mb-4">Arquivo Vazio</h3>
+                    <p className="text-gray-400 mb-6">Nenhum contrato foi arquivado ainda.</p>
+                    <button onClick={onNew} className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold transition-all duration-300">
+                        Criar Primeiro Contrato
+                    </button>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {contracts.map(contract => (
+                        <div key={contract.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 hover:border-gray-600 transition-all duration-300">
+                            <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-xl text-gray-100 mb-1">{contract.title}</h3>
+                                    <p className="text-gray-400 text-sm mb-3">
+                                        Criado em: {new Date(contract.createdAt).toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    <p className="text-sm text-gray-300">
+                                       <span className="font-semibold text-gray-400">Motorista:</span> {contract.data.NOME_MOTORISTA || contract.data.NOME_OPERADOR || 'N/A'}
+                                    </p>
+                                    <p className="text-sm text-gray-300">
+                                       <span className="font-semibold text-gray-400">Matrícula:</span> {contract.data.MATRICULA || 'N/A'}
+                                    </p>
+                                </div>
+                                <div className="flex flex-row md:flex-col items-stretch md:items-end gap-2 w-full md:w-auto">
+                                    <button onClick={() => onEdit(contract)} className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z"></path></svg>
+                                        <span>Editar</span>
+                                    </button>
+                                    <button onClick={() => downloadPdf(contract.pdf, contract.title, contract.data.DATA_ASSINATURA)} className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                        <span>Baixar</span>
+                                    </button>
+                                    <button onClick={() => { if(window.confirm('Tem a certeza que deseja excluir este contrato?')) { onDelete(contract.id) }}} className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        <span>Excluir</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default ManageContracts;
