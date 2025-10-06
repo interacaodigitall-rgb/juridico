@@ -1,9 +1,12 @@
-// FIX: Import React to resolve "Cannot find namespace 'JSX'" error.
+// FIX: Importing React is necessary to use JSX syntax and types like JSX.Element.
 import React from 'react';
 
 export type SyncStatus = 'syncing' | 'synced' | 'error';
 
-const statusConfig: Record<SyncStatus, { icon: JSX.Element; text: string; color: string }> = {
+// FIX: Changed JSX.Element to React.ReactNode to resolve "Cannot find namespace 'JSX'" error.
+// This is a more explicit way to reference React's types and can solve issues where
+// the global JSX namespace isn't being picked up correctly.
+const statusConfig: Record<SyncStatus, { icon: React.ReactNode; text: string; color: string }> = {
     syncing: {
         icon: (
             <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -27,8 +27,6 @@ interface FirebaseUser {
     email: string | null;
 }
 
-declare const firebase: any;
-
 const Header = ({ user, onLogout, syncStatus }: { user: FirebaseUser, onLogout: () => void, syncStatus: SyncStatus }) => (
     <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
         <div className="text-center sm:text-left">
@@ -59,6 +57,14 @@ const App: React.FC = () => {
     const [contracts, setContracts] = useState<SavedContract[]>([]);
 
     useEffect(() => {
+        // If auth service is not available (e.g., if SDK fails to load),
+        // ensure we don't try to use it.
+        if (!auth) {
+            setLoadingAuth(false);
+            setUser(null);
+            return;
+        }
+
         const unsubscribe = auth.onAuthStateChanged((user: FirebaseUser | null) => {
             setUser(user);
             setLoadingAuth(false);
@@ -67,17 +73,18 @@ const App: React.FC = () => {
     }, []);
     
     useEffect(() => {
-        if (user) {
-            setSyncStatus('syncing');
-            loadContracts(user.uid)
-                .then(data => {
-                    setContracts(data);
-                    setSyncStatus('synced');
-                })
-                .catch(() => setSyncStatus('error'));
-        } else {
+        if (!user) {
             setContracts([]);
+            return;
         }
+        
+        setSyncStatus('syncing');
+        loadContracts(user.uid)
+            .then(data => {
+                setContracts(data);
+                setSyncStatus('synced');
+            })
+            .catch(() => setSyncStatus('error'));
     }, [user]);
 
 
@@ -113,10 +120,13 @@ const App: React.FC = () => {
     };
 
     const handleSignComplete = async (signatures: Signatures) => {
-        if (!contractType || !user) return;
+        if (!contractType) return;
         setSyncStatus('syncing');
         try {
             await generateFinalPDF(contractTemplates[contractType], formData, signatures, contractType);
+            
+            if (!user) throw new Error("Utilizador não autenticado");
+
             const newContract: Omit<SavedContract, 'id'> = {
                 type: contractType,
                 title: contractTemplates[contractType].title,
@@ -158,7 +168,9 @@ const App: React.FC = () => {
     };
 
     const handleLogout = () => {
-        auth.signOut();
+        if (auth) {
+            auth.signOut();
+        }
     };
 
     const renderStep = () => {
@@ -190,28 +202,30 @@ const App: React.FC = () => {
     }
 
     return (
-        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6">
-            <style>{`.fade-in { animation: fadeIn 0.5s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .glass-effect { backdrop-filter: blur(16px) saturate(180%); -webkit-backdrop-filter: blur(16px) saturate(180%); background-color: rgba(31, 41, 55, 0.75); border: 1px solid rgba(255, 255, 255, 0.125); }`}</style>
-            <div className="container mx-auto px-4 py-6 max-w-7xl">
-                <Header user={user} onLogout={handleLogout} syncStatus={syncStatus}/>
+        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 font-sans">
+            <div className="p-4 sm:p-6">
+                <style>{`.fade-in { animation: fadeIn 0.5s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .glass-effect { backdrop-filter: blur(16px) saturate(180%); -webkit-backdrop-filter: blur(16px) saturate(180%); background-color: rgba(31, 41, 55, 0.75); border: 1px solid rgba(255, 255, 255, 0.125); }`}</style>
+                <div className="container mx-auto px-4 py-6 max-w-7xl">
+                    <Header user={user} onLogout={handleLogout} syncStatus={syncStatus} />
 
-                <div className="glass-effect rounded-xl p-4 sm:p-6 mb-8">
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <StepIndicator currentStep={step} goToStep={goToStep} completedSteps={completedSteps} />
-                         <button
-                            onClick={() => {
-                                setStep(Step.Manage)
-                                setCompletedSteps(prev => new Set([...prev, Step.Manage]));
-                            }}
-                            className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-300 flex items-center space-x-2 shadow-lg"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
-                            <span>Arquivo</span>
-                        </button>
+                    <div className="glass-effect rounded-xl p-4 sm:p-6 mb-8">
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <StepIndicator currentStep={step} goToStep={goToStep} completedSteps={completedSteps} />
+                            <button
+                                onClick={() => {
+                                    setStep(Step.Manage)
+                                    setCompletedSteps(prev => new Set([...prev, Step.Manage]));
+                                }}
+                                className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-300 flex items-center space-x-2 shadow-lg"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                                <span>Arquivo</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                <main>{renderStep()}</main>
+                    <main>{renderStep()}</main>
+                </div>
             </div>
         </div>
     );

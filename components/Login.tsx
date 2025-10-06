@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { auth } from '../firebase';
 
@@ -56,7 +55,7 @@ const Login: React.FC = () => {
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300"
-                                placeholder="utilizador@asfaltocativante.pt"
+                                placeholder="utilizador@rota5.0.pt"
                             />
                         </div>
                         <div>

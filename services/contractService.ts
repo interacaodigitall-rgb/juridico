@@ -9,6 +9,8 @@ declare global {
     interface Window {
         jspdf: {
             jsPDF: typeof jsPDF;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            GState: any; 
         };
     }
 }
@@ -212,17 +214,18 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         y += signatureHeight + 10; // Reduced spacing after signature
     });
 
-    const totalPages = doc.internal.pages.length;
-    const companyName = empresaData.NOME_EMPRESA;
+    const totalPages = (doc.internal as any).pages.length;
+    const currentCompanyData = empresaData;
 
-    // Add footers to all pages
+    // Add footers and watermark to all pages
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
+        
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
 
         // Company name on ALL pages, without page number
-        const footerText = companyName;
+        const footerText = currentCompanyData.NOME_EMPRESA;
         doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
         // Stamp ONLY on multi-page documents and pages WITHOUT signatures (i.e., not the last page)
