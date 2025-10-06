@@ -6,6 +6,7 @@ export const empresaData: Record<string, string> = {
     NIPC_EMPRESA: "517112604",
     MORADA_EMPRESA: "Praceta Alexandre Herculano, 5 3° ESQ, 2745-706 Queluz",
     LICENCA_TVDE: "225124/2025",
+    VALIDADE_LICENCA_TVDE: "31/07/2035",
     REPRESENTANTE_NOME: "Paulo Rogério Costa Ferreira",
     REPRESENTANTE_CARGO: "único sócio-gerente",
     REPRESENTANTE_NIF: "218953941",
@@ -38,7 +39,7 @@ export const contractTemplates: Record<ContractType, ContractTemplate> = {
 
 ENTRE:
 
-{{NOME_EMPRESA}}, {{TIPO_SOCIEDADE}}, com sede em {{MORADA_EMPRESA}}, com o número de pessoa coletiva {{NIPC_EMPRESA}}, na qualidade de Operadora TVDE registada e licenciada junto do Instituto da Mobilidade e dos Transportes, I.P., sob o n.º de licença {{LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}}, residente na mesma morada da sede, contribuinte fiscal nº {{REPRESENTANTE_NIF}}, doravante designada abreviadamente por "Primeira Contraente" ou "Operadora TVDE";
+{{NOME_EMPRESA}}, {{TIPO_SOCIEDADE}}, com sede em {{MORADA_EMPRESA}}, com o número de pessoa coletiva {{NIPC_EMPRESA}}, na qualidade de Operadora TVDE registada e licenciada junto do Instituto da Mobilidade e dos Transportes, I.P., sob o n.º de licença {{LICENCA_TVDE}}, válida até {{VALIDADE_LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}}, residente na mesma morada da sede, contribuinte fiscal nº {{REPRESENTANTE_NIF}}, doravante designada abreviadamente por "Primeira Contraente" ou "Operadora TVDE";
 
 E
 
@@ -135,7 +136,7 @@ E
 {{NOME_MOTORISTA}}, residente em {{MORADA_MOTORISTA}}, portador do Cartão de Cidadão n.º {{CC}}, válido até {{VALIDADE_CC}}, e do Certificado de Motorista TVDE n.º {{CERTIFICADO_TVDE}}, doravante designado abreviadamente por "Segundo Contraente" ou "Motorista".
 
 CONSIDERANDO QUE:
-A. A Primeira Contraente dedica-se à actividade de Operadora TVDE, devidamente licenciada junto do IMT, para transporte individual e remunerado de passageiros em viaturas descaracterizadas a partir de plataforma electrónica;
+A. A Primeira Contraente dedica-se à actividade de Operadora TVDE, devidamente licenciada junto do IMT sob o n.º de licença {{LICENCA_TVDE}}, válida até {{VALIDADE_LICENCA_TVDE}}, para transporte individual e remunerado de passageiros em viaturas descaracterizadas a partir de plataforma electrónica;
 B. O Segundo Contraente é motorista devidamente certificado para a actividade de transporte em viatura descaracterizada a partir de plataforma electrónica;
 C. As Partes têm interesse em regular, por escrito e de boa-fé, a relação de aluguer de viatura entre a Frota/Operadora TVDE e o Motorista.
 
@@ -229,7 +230,7 @@ Estado da viatura na entrega:
         ],
         template: `DECLARAÇÃO DE AUTORIZAÇÃO PARA INSCRIÇÃO DE VEÍCULO EM PLATAFORMA UBER
 
-{{NOME_PROPRIETARIO}}, com sede em {{MORADA_PROPRIETARIO}}, com o número de identificação NIF {{NIF_PROPRIETARIO}}, na qualidade de único proprietário do veículo (o "Proprietário do Veículo") com a marca {{MARCA}}, modelo {{MODELO}}, matrícula {{MATRICULA}}, com data de matrícula {{DATA_MATRICULA}} (o "Veículo"), pela presente declaração autoriza a entidade {{NOME_OPERADORA}}, com sede em {{MORADA_OPERADORA}}, com o número de identificação NIPC {{NIPC_OPERADORA}}, Operadora TVDE registada e devidamente licenciada junto do Instituto da Mobilidade e dos Transportes, I.P. com o n.º de licença {{N_LICENCA}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}} ("Operador TVDE"), a proceder à inscrição e registo do Veículo na plataforma eletrónica UBER, nos termos e para os efeitos do artigo 12.º n.º 1 da Lei n.º 45/2018, de 10 de agosto ("Lei TVDE").
+{{NOME_PROPRIETARIO}}, com sede em {{MORADA_PROPRIETARIO}}, com o número de identificação NIF {{NIF_PROPRIETARIO}}, na qualidade de único proprietário do veículo (o "Proprietário do Veículo") com a marca {{MARCA}}, modelo {{MODELO}}, matrícula {{MATRICULA}}, com data de matrícula {{DATA_MATRICULA}} (o "Veículo"), pela presente declaração autoriza a entidade {{NOME_OPERADORA}}, com sede em {{MORADA_OPERADORA}}, com o número de identificação NIPC {{NIPC_OPERADORA}}, Operadora TVDE registada e devidamente licenciada junto do Instituto da Mobilidade e dos Transportes, I.P. com o n.º de licença {{N_LICENCA}}, válida até {{VALIDADE_LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}} ("Operador TVDE"), a proceder à inscrição e registo do Veículo na plataforma eletrónica UBER, nos termos e para os efeitos do artigo 12.º n.º 1 da Lei n.º 45/2018, de 10 de agosto ("Lei TVDE").
 
 {{NOME_MOTORISTA}}, residente em {{MORADA_MOTORISTA}}, portador do CC n.º {{CC}}, válido até {{VALIDADE_CC}}, com o endereço de e-mail {{EMAIL}}, motorista TVDE, devidamente licenciado junto do IMT com o certificado de motorista n.º {{CERTIFICADO_TVDE}}, declara que tomou conhecimento da presente declaração.
 
@@ -240,7 +241,7 @@ O Motorista declara e garante que, juntamente com o Veículo, cumpre e cumprirá
         title: "Contrato de Comodato para Plataforma Bolt",
         fields: [
             { name: "NOME_PROPRIETARIO", label: "Nome do Proprietário do Veículo", type: "text", required: true, category: "proprietario" },
-            { name: "MORADA_PROPRIETARIO", label: "Morada do Proprietário", type: "text", required: true, category: "proprietario" },
+            { name: "MORADA_PROPRIETario", label: "Morada do Proprietário", type: "text", required: true, category: "proprietario" },
             { name: "NIF_PROPRIETARIO", label: "NIF do Proprietário", type: "text", required: true, category: "proprietario" },
             { name: "MARCA", label: "Marca do Veículo", type: "text", required: true, category: "veiculo" },
             { name: "MODELO", label: "Modelo do Veículo", type: "text", required: true, category: "veiculo" },
@@ -257,7 +258,7 @@ O Motorista declara e garante que, juntamente com o Veículo, cumpre e cumprirá
 Durante o período do contrato, o 1.º Contratante compromete-se a manter o seguro do veículo válido.
 
 2. Comodatário – entidade que usufrui do bem emprestado
-{{NOME_OPERADOR}}, com sede em {{MORADA_OPERADOR}}, com o número de matrícula e NIPC {{NIPC_OPERADOR}}, Operadora TVDE registada e devidamente licenciada junto do IMT com o n.º de licença {{N_LICENCA}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}}, a proceder à inscrição e registo do Veículo na plataforma eletrónica Bolt, nos termos e para os efeitos do artigo 12.º n.º 1 da Lei n.º 45/2018, de 10 de agosto ("Lei TVDE").
+{{NOME_OPERADOR}}, com sede em {{MORADA_OPERADOR}}, com o número de matrícula e NIPC {{NIPC_OPERADOR}}, Operadora TVDE registada e devidamente licenciada junto do IMT com o n.º de licença {{N_LICENCA}}, válida até {{VALIDADE_LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}}, a proceder à inscrição e registo do Veículo na plataforma eletrónica Bolt, nos termos e para os efeitos do artigo 12.º n.º 1 da Lei n.º 45/2018, de 10 de agosto ("Lei TVDE").
 
 Condições de devolução
 O Veículo deve ser devolvido no estado em que foi entregue.

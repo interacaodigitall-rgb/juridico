@@ -1,4 +1,4 @@
-
+// FIX: Import React to resolve "Cannot find namespace 'JSX'" error.
 import React from 'react';
 
 export type SyncStatus = 'syncing' | 'synced' | 'error';
