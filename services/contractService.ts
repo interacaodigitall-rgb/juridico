@@ -1,4 +1,3 @@
-
 import { jsPDF } from 'jspdf';
 import { SavedContract, ContractTemplate, FormData, Signatures, ContractType } from '../types';
 import { empresaData } from '../constants';
@@ -78,22 +77,29 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     const title = contentLines.find(line => line.trim() !== '') || template.title;
     const body = contentLines.slice(contentLines.indexOf(title) + 1).join('\n');
 
-    // Define rendering configurations to try, from default to more compact.
-    const renderConfigs = [
-        { id: 'default', fontSize: 12, lineHeight: 6, margin: 15, yStart: 30 },
-        { id: 'compact', fontSize: 11.5, lineHeight: 5.8, margin: 15, yStart: 28 },
-        { id: 'extra-compact', fontSize: 11, lineHeight: 5.5, margin: 12, yStart: 25 },
-        { id: 'super-compact', fontSize: 10.5, lineHeight: 5.3, margin: 12, yStart: 25 }
-    ];
+    // Define rendering configurations to try, with a special compact version for 'uber'.
+    let renderConfigs;
+    if (contractType === 'uber') {
+        renderConfigs = [
+             { id: 'uber-special', fontSize: 9.8, lineHeight: 4.8, margin: 20, yStart: 25 },
+        ];
+    } else {
+        renderConfigs = [
+            { id: 'default', fontSize: 12, lineHeight: 6, margin: 15, yStart: 30 },
+            { id: 'compact', fontSize: 11.5, lineHeight: 5.8, margin: 15, yStart: 28 },
+            { id: 'extra-compact', fontSize: 11, lineHeight: 5.5, margin: 12, yStart: 25 },
+            { id: 'super-compact', fontSize: 10.5, lineHeight: 5.3, margin: 12, yStart: 25 }
+        ];
+    }
 
     let finalDoc: jsPDF | null = null;
     let finalConfig = renderConfigs[0];
     let finalY = 0;
 
-    // Signature block dimensions (made more compact)
+    // Signature block dimensions, adjusted for Uber contract to be more compact.
     const signatureWidth = 55;
     const signatureHeight = 22;
-    const singleSignatureHeight = 40; // Approx height for text + image + spacing
+    const singleSignatureHeight = contractType === 'uber' ? 36 : 40; 
     const signatureBlockHeight = (template.signatures.length * singleSignatureHeight);
 
     // Find the best config that fits the signatures on the last content page
@@ -170,7 +176,13 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    y += 15; // Reduced vertical space before signatures
+    // Define signature spacing variables, with compact values for the Uber contract.
+    const spaceBeforeSignatures = contractType === 'uber' ? 12 : 15;
+    const signerNameFontSize = contractType === 'uber' ? 8.5 : 9;
+    const textLineHeightFactor = contractType === 'uber' ? 3.0 : 3.5;
+    const spaceAfterSignature = contractType === 'uber' ? 7 : 10;
+    
+    y += spaceBeforeSignatures;
 
     template.signatures.forEach((signerName) => {
          if (y + singleSignatureHeight > pageHeight - margin) {
@@ -182,7 +194,7 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         if (!signatureDataUrl) return;
 
         let signatureBlockText = '';
-        doc.setFontSize(9); // Reduced font size for signer name
+        doc.setFontSize(signerNameFontSize);
         doc.setFont('times', 'normal');
 
         if(signerName === 'NOME_PROPRIETARIO') {
@@ -201,7 +213,7 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         
         const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (margin * 2));
         doc.text(textLines, pageWidth / 2, y, { align: 'center' });
-        y += (textLines.length * 3.5) + 2; // Reduced line height factor
+        y += (textLines.length * textLineHeightFactor) + 2;
 
         const centeredSignatureX = (pageWidth - signatureWidth) / 2;
         try {
@@ -211,7 +223,7 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
             doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight);
             doc.text('Signature Error', centeredSignatureX + 5, y + 15);
         }
-        y += signatureHeight + 10; // Reduced spacing after signature
+        y += signatureHeight + spaceAfterSignature;
     });
 
     const totalPages = (doc.internal as any).pages.length;

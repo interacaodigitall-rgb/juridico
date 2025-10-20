@@ -241,7 +241,7 @@ O Motorista declara e garante que, juntamente com o Veículo, cumpre e cumprirá
         title: "Contrato de Comodato para Plataforma Bolt",
         fields: [
             { name: "NOME_PROPRIETARIO", label: "Nome do Proprietário do Veículo", type: "text", required: true, category: "proprietario" },
-            { name: "MORADA_PROPRIETario", label: "Morada do Proprietário", type: "text", required: true, category: "proprietario" },
+            { name: "MORADA_PROPRIETARIO", label: "Morada do Proprietário", type: "text", required: true, category: "proprietario" },
             { name: "NIF_PROPRIETARIO", label: "NIF do Proprietário", type: "text", required: true, category: "proprietario" },
             { name: "MARCA", label: "Marca do Veículo", type: "text", required: true, category: "veiculo" },
             { name: "MODELO", label: "Modelo do Veículo", type: "text", required: true, category: "veiculo" },
