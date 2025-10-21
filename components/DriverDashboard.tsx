@@ -40,9 +40,6 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, userProfile, on
         return <SignView contract={selectedContract} onBack={handleBackToList} />;
     }
 
-    const pendingContracts = contracts.filter(c => c.status === 'pending_signature');
-    const completedContracts = contracts.filter(c => c.status === 'completed');
-
     return (
         <div className="p-4 sm:p-6">
             <div className="container mx-auto px-4 py-6 max-w-4xl">
@@ -55,8 +52,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, userProfile, on
                 </div>
 
                 <div className="space-y-10">
-                    <ContractList title="Contratos Pendentes de Assinatura" contracts={pendingContracts} onAction={handleSignContract} actionLabel="Rever e Assinar" />
-                    <ContractList title="Contratos Concluídos" contracts={completedContracts} onAction={async (c) => await generateFinalPDF(contractTemplates[c.type], c.data, c.signatures, c.type)} actionLabel="Baixar PDF" />
+                    <ContractList title="Documentos para Assinar" contracts={contracts} onAction={handleSignContract} actionLabel="Rever e Assinar" />
                 </div>
             </div>
         </div>
@@ -69,7 +65,11 @@ const ContractList: React.FC<{ title: string; contracts: SavedContract[]; onActi
     <div>
         <h2 className="text-2xl font-semibold text-gray-200 mb-4 border-b-2 border-gray-700 pb-2">{title}</h2>
         {contracts.length === 0 ? (
-            <p className="text-gray-500">Não há contratos nesta secção.</p>
+            <div className="text-center py-10">
+                <div className="text-5xl mb-4">👍</div>
+                <h3 className="text-xl font-bold text-gray-300">Tudo em ordem!</h3>
+                <p className="text-gray-400">De momento, não tem contratos pendentes para assinar.</p>
+            </div>
         ) : (
             <div className="space-y-4">
                 {contracts.map(contract => (

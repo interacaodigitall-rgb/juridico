@@ -25,7 +25,11 @@ const signatureRequestsRef = firestore.collection('signatureRequests');
 export const loadContracts = async (uid: string, role: 'admin' | 'driver'): Promise<SavedContract[]> => {
     if (role === 'driver') {
         try {
-            const snapshot = await contractsRef.where('driverUid', '==', uid).orderBy('createdAt', 'desc').get();
+            const snapshot = await contractsRef
+                .where('driverUid', '==', uid)
+                .where('status', '==', 'pending_signature')
+                .orderBy('createdAt', 'desc')
+                .get();
             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
         } catch (error) {
             console.error('Error loading driver contracts from Firestore:', error);

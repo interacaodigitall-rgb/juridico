@@ -102,7 +102,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         setSyncStatus('syncing');
 
         const driverEmail = formData.DRIVER_EMAIL;
-        const driverPasswordSuggestion = formData.CC || formData.NIF_PROPRIETARIO || 'password123';
+        const driverPasswordSuggestion = '0123456';
 
         try {
             // 1. Encontrar ou criar o motorista
@@ -110,7 +110,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             
             if (!driverProfile) {
                 // Se o motorista não existe, instruir o admin a criá-lo.
-                 const shouldCreate = window.confirm(`Não foi encontrada uma conta para o motorista com o e-mail ${driverEmail}.\n\nPara prosseguir, uma conta precisa de ser criada para ele na consola do Firebase.\n\nPalavra-passe sugerida (use o CC ou NIF): ${driverPasswordSuggestion}\n\nClique em 'OK' se já criou a conta e quer tentar novamente.`);
+                 const shouldCreate = window.confirm(`Não foi encontrada uma conta para o motorista com o e-mail ${driverEmail}.\n\nPara prosseguir, uma conta precisa de ser criada para ele na consola do Firebase.\n\nUse a palavra-passe temporária: ${driverPasswordSuggestion}\n\nO motorista poderá usá-la para aceder e assinar. Clique em 'OK' se já criou a conta e quer tentar novamente.`);
                 if (shouldCreate) {
                     driverProfile = await findUserByEmail(driverEmail);
                     if (!driverProfile) {

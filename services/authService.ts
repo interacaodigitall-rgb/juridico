@@ -38,18 +38,27 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
         return null;
 
     } catch (error: any) {
-        console.error("Erro ao obter o perfil do utilizador:", error);
+        console.error("Erro ao obter o perfil do utilizador:", error.message);
         
-        // HACK/FALLBACK: Se o erro for de permissão (o que é provável), mas o utilizador
-        // for o administrador conhecido, retorna um perfil temporário em memória para desbloquear o login.
-        // Isto permite que o administrador aceda à aplicação mesmo com regras de segurança mal configuradas.
-        if (auth.currentUser && auth.currentUser.email === ADMIN_EMAIL && (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED')) {
-            console.warn("O acesso ao Firestore falhou. A assumir o papel de administrador com base no e-mail.");
-            return {
-                uid: auth.currentUser.uid,
-                email: auth.currentUser.email!,
-                role: 'admin',
-            };
+        // FALLBACK: Se o erro for de permissão, mas o utilizador estiver autenticado,
+        // inferimos o seu papel para desbloquear o login.
+        // Isto permite que o utilizador aceda à aplicação mesmo com regras de segurança mal configuradas.
+        if (auth.currentUser && (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED' || error.message.includes('insufficient permissions'))) {
+            if (auth.currentUser.email === ADMIN_EMAIL) {
+                console.warn("O acesso ao Firestore falhou. A assumir o papel de administrador com base no e-mail.");
+                return {
+                    uid: auth.currentUser.uid,
+                    email: auth.currentUser.email!,
+                    role: 'admin',
+                };
+            } else {
+                 console.warn(`O acesso ao Firestore falhou para ${auth.currentUser.email}. A assumir o papel de motorista como fallback.`);
+                 return {
+                    uid: auth.currentUser.uid,
+                    email: auth.currentUser.email!,
+                    role: 'driver',
+                 };
+            }
         }
 
         return null;
