@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest } from '../types';
+import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest, ContractStatus } from '../types';
 import { empresaData } from '../constants';
 import { firestore } from '../firebase';
 
@@ -17,12 +17,15 @@ declare global {
 // Declara o objeto global do Firebase para que o TypeScript o reconheça
 declare const firebase: any;
 
-// --- Firestore Service ---
+// --- Firestore Service (New Structure) ---
 
-export const loadContracts = async (userId: string): Promise<SavedContract[]> => {
+const contractsRef = firestore.collection('contracts');
+const signatureRequestsRef = firestore.collection('signatureRequests');
+
+export const loadContracts = async (uid: string, role: 'admin' | 'driver'): Promise<SavedContract[]> => {
     try {
-        const contractsRef = firestore.collection('users').doc(userId).collection('contracts');
-        const snapshot = await contractsRef.orderBy('createdAt', 'desc').get();
+        const queryField = role === 'admin' ? 'adminUid' : 'driverUid';
+        const snapshot = await contractsRef.where(queryField, '==', uid).orderBy('createdAt', 'desc').get();
         if (snapshot.empty) {
             return [];
         }
@@ -37,9 +40,8 @@ export const loadContracts = async (userId: string): Promise<SavedContract[]> =>
     }
 };
 
-export const saveContract = async (userId: string, contractData: Omit<SavedContract, 'id'>): Promise<string> => {
+export const saveContract = async (contractData: Omit<SavedContract, 'id'>): Promise<string> => {
     try {
-        const contractsRef = firestore.collection('users').doc(userId).collection('contracts');
         const docRef = await contractsRef.add(contractData);
         return docRef.id;
     } catch (error) {
@@ -48,18 +50,141 @@ export const saveContract = async (userId: string, contractData: Omit<SavedContr
     }
 };
 
-export const deleteContract = async (userId: string, contractId: string): Promise<void> => {
+export const updateContractSignatures = async (contractId: string, signatures: Signatures, status: ContractStatus): Promise<void> => {
     try {
-        const contractRef = firestore.collection('users').doc(userId).collection('contracts').doc(contractId);
-        await contractRef.delete();
+        await contractsRef.doc(contractId).update({
+            signatures,
+            status,
+        });
+    } catch (error) {
+        console.error('Error updating contract signatures:', error);
+        throw new Error('Falha ao atualizar as assinaturas do contrato.');
+    }
+};
+
+
+export const deleteContract = async (contractId: string): Promise<void> => {
+    try {
+        await contractsRef.doc(contractId).delete();
     } catch (error) {
         console.error('Error deleting contract from Firestore:', error);
         throw new Error('Falha ao apagar o contrato.');
     }
 };
 
+// --- Signature Request Service ---
 
-// --- PDF Generation Service ---
+export const createSignatureRequest = async (
+    adminUid: string, 
+    contractType: ContractType, 
+    formData: FormData, 
+    signers: string[]
+): Promise<string> => {
+    try {
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 48); // 48h expiration
+
+        const newRequest = {
+            userId: adminUid,
+            contractType,
+            formData,
+            signers,
+            signatures: {},
+            status: 'pending' as const,
+            createdAt: now,
+            expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt),
+        };
+        const docRef = await signatureRequestsRef.add(newRequest);
+        return docRef.id;
+    } catch (error) {
+        console.error('Error creating signature request:', error);
+        throw new Error('Falha ao criar o pedido de assinatura remota.');
+    }
+};
+
+export const listenToSignatureRequest = (
+    requestId: string, 
+    callback: (request: SignatureRequest | null) => void
+): (() => void) => {
+    return signatureRequestsRef.doc(requestId).onSnapshot(
+        doc => {
+            if (doc.exists) {
+                const data = doc.data() as Omit<SignatureRequest, 'id'>;
+                callback({ id: doc.id, ...data });
+            } else {
+                callback(null);
+            }
+        },
+        error => {
+            console.error('Error listening to signature request:', error);
+            callback(null);
+        }
+    );
+};
+
+export const getSignatureRequest = async (requestId: string): Promise<SignatureRequest | null> => {
+    try {
+        const doc = await signatureRequestsRef.doc(requestId).get();
+        if (!doc.exists) {
+            console.log('No such signature request!');
+            return null;
+        }
+        const request = { id: doc.id, ...doc.data() } as SignatureRequest;
+
+        // Check for expiration
+        if (request.expiresAt && request.expiresAt.toDate() < new Date()) {
+            console.log('Signature request has expired.');
+            return null;
+        }
+
+        return request;
+    } catch (error) {
+        console.error('Error getting signature request:', error);
+        return null;
+    }
+};
+
+export const updateSignature = async (
+    requestId: string,
+    signerName: string,
+    signatureDataUrl: string
+): Promise<void> => {
+    try {
+        const docRef = signatureRequestsRef.doc(requestId);
+        const doc = await docRef.get();
+        if (!doc.exists) {
+            throw new Error("Signature request not found.");
+        }
+
+        const requestData = doc.data() as SignatureRequest;
+
+        const updatedSignatures = {
+            ...requestData.signatures,
+            [signerName]: signatureDataUrl,
+        };
+
+        const updatePayload: { signatures: Signatures; status?: 'completed' } = {
+            signatures: updatedSignatures,
+        };
+
+        const allSigners = requestData.signers;
+        const allSigned = allSigners.every(signer => updatedSignatures[signer]);
+
+        if (allSigned) {
+            updatePayload.status = 'completed';
+        }
+
+        await docRef.update(updatePayload);
+
+    } catch (error) {
+        console.error('Error updating signature:', error);
+        throw new Error('Falha ao atualizar a assinatura.');
+    }
+};
+
+
+// --- PDF Generation Service (No changes needed here, but kept for completeness) ---
 
 export const generateFinalPDF = async (template: ContractTemplate, formData: FormData, signatures: Signatures, contractType: ContractType): Promise<{ pdfBlob: Blob, pdfDataUri: string }> => {
     if (!window.jspdf || !window.jspdf.jsPDF) {
@@ -88,7 +213,6 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     const title = contentLines.find(line => line.trim() !== '') || template.title;
     const body = contentLines.slice(contentLines.indexOf(title) + 1).join('\n');
 
-    // Define rendering configurations to try, with a special compact version for 'uber'.
     let renderConfigs;
     if (contractType === 'uber') {
         renderConfigs = [
@@ -107,13 +231,11 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     let finalConfig = renderConfigs[0];
     let finalY = 0;
 
-    // Signature block dimensions, adjusted for Uber contract to be more compact.
     const signatureWidth = 55;
     const signatureHeight = 22;
     const singleSignatureHeight = contractType === 'uber' ? 36 : 40; 
     const signatureBlockHeight = (template.signatures.length * singleSignatureHeight);
 
-    // Find the best config that fits the signatures on the last content page
     for (const config of renderConfigs) {
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -149,7 +271,6 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         }
     }
     
-    // If no config worked, use the most compact one and let it flow to the next page if needed
     if (!finalDoc) {
         finalConfig = renderConfigs[renderConfigs.length - 1];
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
@@ -187,7 +308,6 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     const pageHeight = doc.internal.pageSize.getHeight();
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Define signature spacing variables, with compact values for the Uber contract.
     const spaceBeforeSignatures = contractType === 'uber' ? 12 : 15;
     const signerNameFontSize = contractType === 'uber' ? 8.5 : 9;
     const textLineHeightFactor = contractType === 'uber' ? 3.0 : 3.5;
@@ -240,21 +360,18 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     const totalPages = (doc.internal as any).pages.length;
     const currentCompanyData = empresaData;
 
-    // Add footers and watermark to all pages
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
 
-        // Company name on ALL pages, without page number
         const footerText = currentCompanyData.NOME_EMPRESA;
         doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-        // Stamp ONLY on multi-page documents and pages WITHOUT signatures (i.e., not the last page)
         if (totalPages > 1 && i < totalPages) {
             const stampText = `DOCUMENTO ASSINADO EM ${new Date().toLocaleDateString('pt-PT')}`;
-            const stampY = pageHeight - 17; // Placed slightly above the footer text
+            const stampY = pageHeight - 17;
             const textWidth = doc.getTextWidth(stampText);
             
             doc.setDrawColor(150, 150, 150);
@@ -263,7 +380,6 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         }
     }
 
-    // Set back to the last page and reset color before outputting
     doc.setPage(totalPages);
     doc.setTextColor(0, 0, 0); 
     
@@ -274,93 +390,4 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     doc.save(fileName);
 
     return { pdfBlob, pdfDataUri };
-};
-
-export const downloadPdf = (pdfDataUri: string, title: string, date: string) => {
-    const link = document.createElement('a');
-    link.href = pdfDataUri;
-    link.download = `${title.replace(/\s+/g, '_')}_${date}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
-
-
-// --- Signature Request Service ---
-
-export const createSignatureRequest = async (userId: string, contractType: ContractType, formData: FormData, signers: string[]): Promise<string> => {
-    try {
-        const signatureRequestsRef = firestore.collection('signatureRequests');
-        // FIX: Use the global firebase object directly to ensure access to firestore static properties
-        const createdAt = firebase.firestore.FieldValue.serverTimestamp();
-        const expiresAt = firebase.firestore.Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000); // 48 hours expiration
-
-        const newRequest = {
-            userId,
-            contractType,
-            formData,
-            signatures: {},
-            signers,
-            status: 'pending',
-            createdAt,
-            expiresAt,
-        };
-
-        const docRef = await signatureRequestsRef.add(newRequest);
-        return docRef.id;
-    } catch (error) {
-        console.error('Error creating signature request:', error);
-        throw new Error('Falha ao criar o pedido de assinatura remota.');
-    }
-};
-
-export const getSignatureRequest = async (id: string): Promise<SignatureRequest | null> => {
-    try {
-        const docRef = firestore.collection('signatureRequests').doc(id);
-        const doc = await docRef.get();
-        if (!doc.exists) {
-            return null;
-        }
-        const data = doc.data();
-        // Check for expiration
-        if (data.expiresAt && data.expiresAt.toMillis() < Date.now()) {
-             console.warn('Signature request has expired');
-             await docRef.delete();
-             return null;
-        }
-        return { id: doc.id, ...data } as SignatureRequest;
-    } catch (error) {
-        console.error('Error getting signature request:', error);
-        return null;
-    }
-};
-
-export const updateSignature = async (id: string, signerName: string, signatureDataUrl: string): Promise<void> => {
-    try {
-        const docRef = firestore.collection('signatureRequests').doc(id);
-        await docRef.update({
-            [`signatures.${signerName}`]: signatureDataUrl
-        });
-    } catch (error) {
-        console.error('Error updating signature:', error);
-        throw new Error('Falha ao guardar a assinatura.');
-    }
-};
-
-export const listenToSignatureRequest = (id: string, callback: (data: SignatureRequest | null) => void): (() => void) => {
-    const docRef = firestore.collection('signatureRequests').doc(id);
-    const unsubscribe = docRef.onSnapshot(
-        (doc) => {
-            if (doc.exists) {
-                callback({ id: doc.id, ...doc.data() } as SignatureRequest);
-            } else {
-                callback(null);
-            }
-        },
-        (error) => {
-            console.error("Error listening to signature request:", error);
-            callback(null);
-        }
-    );
-    return unsubscribe;
 };

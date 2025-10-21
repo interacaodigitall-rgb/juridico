@@ -64,6 +64,14 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
                 hasError = true;
             }
         });
+
+        // Add validation for the new driver email field
+        if (!formData.DRIVER_EMAIL?.trim()) {
+            newErrors['DRIVER_EMAIL'] = true;
+            hasError = true;
+        }
+
+
         setErrors(newErrors);
         if (!hasError) {
             const dataToSend = { ...formData };
@@ -89,6 +97,25 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
             <p className="text-gray-400 mb-8">Preencha todos os campos obrigatórios para gerar o contrato.</p>
 
             <div className="space-y-8">
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+                    <h3 className="font-bold text-xl mb-4 text-gray-100 border-l-4 border-yellow-500 pl-4">Atribuição do Contrato</h3>
+                     <div>
+                        <label htmlFor="field-DRIVER_EMAIL" className="block text-sm font-semibold text-gray-300 mb-2">
+                            E-mail do Motorista <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                            type="email"
+                            id="field-DRIVER_EMAIL"
+                            name="DRIVER_EMAIL"
+                            value={formData['DRIVER_EMAIL'] || ''}
+                            onChange={handleChange}
+                            className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 border-gray-600 ${errors['DRIVER_EMAIL'] ? 'border-red-500 ring-red-500' : ''}`}
+                            placeholder="email.motorista@exemplo.com"
+                        />
+                         <p className="text-xs text-gray-400 mt-2">Este e-mail será usado para o login do motorista no portal de assinaturas.</p>
+                    </div>
+                </div>
+
                 {(Object.keys(groupedFields) as FieldCategory[]).map(categoryKey => (
                     <div key={categoryKey} className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
                          <h3 className="font-bold text-xl mb-4 text-gray-100 border-l-4 border-blue-500 pl-4">{categories[categoryKey].title}</h3>

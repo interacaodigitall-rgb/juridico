@@ -30,13 +30,19 @@ export type FormData = Record<string, string>;
 
 export type Signatures = Record<string, string>; // signerName -> dataURL
 
+export type ContractStatus = 'pending_signature' | 'completed';
+
 export interface SavedContract {
     id: string;
     type: ContractType;
     title: string;
     data: FormData;
     signatures: Signatures;
-    createdAt: string;
+    createdAt: string; // ISO String
+    adminUid: string;
+    driverUid: string;
+    driverEmail: string;
+    status: ContractStatus;
 }
 
 export interface SignatureRequest {
@@ -49,4 +55,12 @@ export interface SignatureRequest {
     status: 'pending' | 'completed';
     createdAt: any; // Firestore Timestamp
     expiresAt: any; // Firestore Timestamp
+}
+
+export type UserRole = 'admin' | 'driver';
+
+export interface UserProfile {
+    uid: string;
+    email: string;
+    role: UserRole;
 }
