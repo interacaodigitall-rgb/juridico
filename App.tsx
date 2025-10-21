@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Step, ContractType, FormData, Signatures, SavedContract } from './types';
 import { contractTemplates, empresaData } from './constants';
@@ -182,7 +181,7 @@ const App: React.FC = () => {
                 return <ContractForm template={contractTemplates[contractType]} onBack={resetProcess} onNext={handleFormSubmit} initialData={formData}/>;
             case Step.Preview:
                 if (!contractType) return null;
-                return <PreviewContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Form)} onNext={handlePreviewAccept} />;
+                return <PreviewContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Form)} onNext={handlePreviewAccept} contractType={contractType} />;
             case Step.Sign:
                 if (!contractType) return null;
                 return <SignContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Preview)} onComplete={handleSignComplete} />;

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ContractTemplate, FormData, FieldCategory } from '../types';
 import { empresaData } from '../constants';
@@ -35,16 +34,31 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
     const [errors, setErrors] = useState<Record<string, boolean>>({});
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-        if (errors[e.target.name]) {
-            setErrors({ ...errors, [e.target.name]: false });
+        const { name, value, type, checked } = e.target;
+        const newValue = type === 'checkbox' ? checked.toString() : value;
+        
+        setFormData(prev => {
+            const newData = { ...prev, [name]: newValue };
+            if (name === 'MODALIDADE_50_50' && checked) {
+                newData['VALOR_RENDA'] = ''; 
+            }
+            return newData;
+        });
+        
+        if (errors[name]) {
+            setErrors({ ...errors, [name]: false });
         }
     };
 
     const handleSubmit = () => {
         const newErrors: Record<string, boolean> = {};
         let hasError = false;
+        const is5050 = formData.MODALIDADE_50_50 === 'true';
+
         template.fields.forEach(field => {
+            if (is5050 && field.name === 'VALOR_RENDA') {
+                return;
+            }
             if (field.required && !formData[field.name]?.trim()) {
                 newErrors[field.name] = true;
                 hasError = true;
@@ -52,7 +66,11 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
         });
         setErrors(newErrors);
         if (!hasError) {
-            onNext(formData);
+            const dataToSend = { ...formData };
+            if (is5050) {
+                dataToSend.VALOR_RENDA = 'N/A';
+            }
+            onNext(dataToSend);
         } else {
             alert('⚠️ Por favor, preencha todos os campos obrigatórios marcados com *');
         }
@@ -63,6 +81,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
         return acc;
     }, {} as Record<FieldCategory, typeof template.fields>);
 
+    const is5050mode = formData.MODALIDADE_50_50 === 'true';
 
     return (
         <div className="glass-effect rounded-xl p-8 fade-in">
@@ -78,6 +97,24 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
                                 const isPreFilled = empresaData[field.name] !== undefined;
                                 const hasError = errors[field.name];
 
+                                if (field.type === 'checkbox') {
+                                    return (
+                                        <div key={field.name} className="md:col-span-2 flex items-center space-x-3 pt-2">
+                                            <input
+                                                type="checkbox"
+                                                id={`field-${field.name}`}
+                                                name={field.name}
+                                                checked={formData[field.name] === 'true'}
+                                                onChange={handleChange}
+                                                className="h-5 w-5 rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                            <label htmlFor={`field-${field.name}`} className="text-sm font-semibold text-gray-300 cursor-pointer">
+                                                {field.label}
+                                            </label>
+                                        </div>
+                                    );
+                                }
+
                                 return (
                                 <div key={field.name}>
                                     <label htmlFor={`field-${field.name}`} className="block text-sm font-semibold text-gray-300 mb-2">
@@ -90,8 +127,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
                                         name={field.name}
                                         value={formData[field.name] || ''}
                                         onChange={handleChange}
-                                        readOnly={isPreFilled}
-                                        className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 ${isPreFilled ? 'border-gray-600 text-gray-400 cursor-not-allowed' : 'border-gray-600'} ${hasError ? 'border-red-500 ring-red-500' : ''}`}
+                                        disabled={isPreFilled || (field.name === 'VALOR_RENDA' && is5050mode)}
+                                        className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 ${(isPreFilled || (field.name === 'VALOR_RENDA' && is5050mode)) ? 'border-gray-600 text-gray-500 cursor-not-allowed bg-gray-800' : 'border-gray-600'} ${hasError ? 'border-red-500 ring-red-500' : ''}`}
                                     />
                                 </div>
                                 )

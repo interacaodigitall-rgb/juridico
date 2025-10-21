@@ -1,19 +1,27 @@
-
 import React from 'react';
-import { ContractTemplate, FormData } from '../types';
+import { ContractTemplate, FormData, ContractType } from '../types';
 
 interface PreviewContractProps {
     template: ContractTemplate;
     formData: FormData;
     onBack: () => void;
     onNext: () => void;
+    contractType: ContractType | null;
 }
 
-const PreviewContract: React.FC<PreviewContractProps> = ({ template, formData, onBack, onNext }) => {
+const PreviewContract: React.FC<PreviewContractProps> = ({ template, formData, onBack, onNext, contractType }) => {
     
     let previewContent = template.template;
+
+    if (contractType === 'aluguer' && formData.MODALIDADE_50_50 === 'true') {
+        const fixedRentClause = `O Segundo Contraente obriga-se a pagar à Primeira Contraente uma renda semanal mínima de {{VALOR_RENDA}} €, liquidada antecipadamente, até à segunda-feira de cada semana. O valor inclui utilização da viatura devidamente licenciada, seguro automóvel obrigatório, seguro de acidentes pessoais e manutenção periódica. O atraso superior a 3 dias úteis no pagamento confere à Primeira Contraente o direito de suspender o contrato e recolher de imediato a viatura.`;
+        const fiftyFiftyClause = `A remuneração será partilhada em regime de 50/50% da faturação líquida semanal, após a dedução de todas as taxas das plataformas (Uber, Bolt, etc.) e impostos aplicáveis. As despesas de combustível, portagens e limpeza da viatura são da responsabilidade do Segundo Contraente. Os pagamentos serão efetuados semanalmente por transferência bancária, acompanhados de um extrato detalhado da faturação.`;
+        previewContent = previewContent.replace(fixedRentClause, fiftyFiftyClause);
+    }
+
     Object.entries(formData).forEach(([key, value]) => {
         const regex = new RegExp(`{{${key}}}`, 'g');
+        if (contractType === 'aluguer' && formData.MODALIDADE_50_50 === 'true' && key === 'VALOR_RENDA') return;
         previewContent = previewContent.replace(regex, value || `[${key}]`);
     });
     
