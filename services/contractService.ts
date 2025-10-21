@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
-import { SavedContract, ContractTemplate, FormData, Signatures, ContractType } from '../types';
+import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest } from '../types';
 import { empresaData } from '../constants';
-import { firestore } from '../firebase';
+import { firestore, firebase } from '../firebase';
 
 
 declare global {
@@ -280,4 +280,83 @@ export const downloadPdf = (pdfDataUri: string, title: string, date: string) => 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+};
+
+
+// --- Signature Request Service ---
+
+export const createSignatureRequest = async (userId: string, contractType: ContractType, formData: FormData, signers: string[]): Promise<string> => {
+    try {
+        const signatureRequestsRef = firestore.collection('signatureRequests');
+        const createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        const expiresAt = firebase.firestore.Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000); // 48 hours expiration
+
+        const newRequest = {
+            userId,
+            contractType,
+            formData,
+            signatures: {},
+            signers,
+            status: 'pending',
+            createdAt,
+            expiresAt,
+        };
+
+        const docRef = await signatureRequestsRef.add(newRequest);
+        return docRef.id;
+    } catch (error) {
+        console.error('Error creating signature request:', error);
+        throw new Error('Falha ao criar o pedido de assinatura remota.');
+    }
+};
+
+export const getSignatureRequest = async (id: string): Promise<SignatureRequest | null> => {
+    try {
+        const docRef = firestore.collection('signatureRequests').doc(id);
+        const doc = await docRef.get();
+        if (!doc.exists) {
+            return null;
+        }
+        const data = doc.data();
+        // Check for expiration
+        if (data.expiresAt && data.expiresAt.toMillis() < Date.now()) {
+             console.warn('Signature request has expired');
+             await docRef.delete();
+             return null;
+        }
+        return { id: doc.id, ...data } as SignatureRequest;
+    } catch (error) {
+        console.error('Error getting signature request:', error);
+        return null;
+    }
+};
+
+export const updateSignature = async (id: string, signerName: string, signatureDataUrl: string): Promise<void> => {
+    try {
+        const docRef = firestore.collection('signatureRequests').doc(id);
+        await docRef.update({
+            [`signatures.${signerName}`]: signatureDataUrl
+        });
+    } catch (error) {
+        console.error('Error updating signature:', error);
+        throw new Error('Falha ao guardar a assinatura.');
+    }
+};
+
+export const listenToSignatureRequest = (id: string, callback: (data: SignatureRequest | null) => void): (() => void) => {
+    const docRef = firestore.collection('signatureRequests').doc(id);
+    const unsubscribe = docRef.onSnapshot(
+        (doc) => {
+            if (doc.exists) {
+                callback({ id: doc.id, ...doc.data() } as SignatureRequest);
+            } else {
+                callback(null);
+            }
+        },
+        (error) => {
+            console.error("Error listening to signature request:", error);
+            callback(null);
+        }
+    );
+    return unsubscribe;
 };

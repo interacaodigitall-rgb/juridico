@@ -4,6 +4,7 @@ declare const firebase: any;
 // We declare auth and firestore as potentially null.
 let auth: any = null;
 let firestore: any = null;
+let firebaseInstance: any = null;
 
 const firebaseConfig = {
   apiKey: "AIzaSyAE0XQSsEoBwuc0qeMpdAI3LkVexq1ifFo",
@@ -23,9 +24,10 @@ if (typeof firebase !== 'undefined') {
     // Assign the services to our exported variables.
     auth = firebase.auth();
     firestore = firebase.firestore();
+    firebaseInstance = firebase;
 } else {
     console.error("Firebase SDK not loaded. Authentication and database features will be disabled.");
 }
 
 // Export the (potentially null) services.
-export { auth, firestore };
+export { auth, firestore, firebaseInstance as firebase };

@@ -17,6 +17,7 @@ import {
 import { auth } from './firebase';
 import Login from './components/Login';
 import LoadingSpinner from './components/LoadingSpinner';
+import RemoteSign from './components/RemoteSign';
 
 // FIX: Define a local interface for the user object to resolve TypeScript errors
 // related to the 'firebase' namespace not being found. This ensures type safety
@@ -54,6 +55,8 @@ const App: React.FC = () => {
     const [contractType, setContractType] = useState<ContractType | null>(null);
     const [formData, setFormData] = useState<FormData>({});
     const [contracts, setContracts] = useState<SavedContract[]>([]);
+
+    const isRemoteSignFlow = new URLSearchParams(window.location.search).has('sign');
 
     useEffect(() => {
         // If auth service is not available (e.g., if SDK fails to load),
@@ -184,13 +187,17 @@ const App: React.FC = () => {
                 return <PreviewContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Form)} onNext={handlePreviewAccept} contractType={contractType} />;
             case Step.Sign:
                 if (!contractType) return null;
-                return <SignContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Preview)} onComplete={handleSignComplete} />;
+                return <SignContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Preview)} onComplete={handleSignComplete} contractType={contractType} />;
             case Step.Manage:
                 return <ManageContracts contracts={contracts} onDelete={handleDeleteContract} onEdit={handleEditContract} onNew={resetProcess}/>;
             default:
                 return <SelectContract onSelect={handleSelectContract} />;
         }
     };
+
+    if (isRemoteSignFlow) {
+        return <RemoteSign />;
+    }
 
     if (loadingAuth) {
         return <LoadingSpinner />;

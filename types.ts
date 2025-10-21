@@ -1,4 +1,3 @@
-
 export enum Step {
     Select,
     Form,
@@ -38,4 +37,16 @@ export interface SavedContract {
     data: FormData;
     signatures: Signatures;
     createdAt: string;
+}
+
+export interface SignatureRequest {
+    id: string;
+    userId: string;
+    contractType: ContractType;
+    formData: FormData;
+    signatures: Signatures;
+    signers: string[];
+    status: 'pending' | 'completed';
+    createdAt: any; // Firestore Timestamp
+    expiresAt: any; // Firestore Timestamp
 }
