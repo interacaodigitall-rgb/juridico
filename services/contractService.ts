@@ -23,38 +23,57 @@ const contractsRef = firestore.collection('contracts');
 const signatureRequestsRef = firestore.collection('signatureRequests');
 
 export const loadContracts = async (uid: string, role: 'admin' | 'driver'): Promise<SavedContract[]> => {
-    try {
-        if (role === 'driver') {
-            // Drivers only read from the new global collection, which is correct.
+    if (role === 'driver') {
+        try {
             const snapshot = await contractsRef.where('driverUid', '==', uid).orderBy('createdAt', 'desc').get();
             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+        } catch (error) {
+            console.error('Error loading driver contracts from Firestore:', error);
+            alert('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet.');
+            return [];
         }
+    }
 
-        // --- Admin Loading Logic (Backward Compatibility) ---
-        // Admin loads from BOTH the new global collection and the old user-specific subcollection.
-
-        // 1. Fetch from new global 'contracts' collection
+    // --- Admin Loading Logic (Backward Compatibility & Resilient) ---
+    try {
         const newContractsPromise = contractsRef.where('adminUid', '==', uid).get();
-        
-        // 2. Fetch from old 'users/{uid}/contracts' subcollection
         const oldContractsRef = firestore.collection('users').doc(uid).collection('contracts');
         const oldContractsPromise = oldContractsRef.get();
         
-        const [newSnapshot, oldSnapshot] = await Promise.all([newContractsPromise, oldContractsPromise]);
-        
-        const newContracts = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-        const oldContracts = oldSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+        const results = await Promise.allSettled([newContractsPromise, oldContractsPromise]);
 
-        // 3. Combine, sort, and return all contracts
-        const allContracts = [...newContracts, ...oldContracts];
-        allContracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const newContractsResult = results[0];
+        const oldContractsResult = results[1];
+        let allContracts: SavedContract[] = [];
+
+        if (newContractsResult.status === 'fulfilled') {
+            const newContracts = newContractsResult.value.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+            allContracts.push(...newContracts);
+        } else {
+            console.error('Error loading contracts from the new `contracts` collection:', newContractsResult.reason);
+        }
         
-        // Basic deduplication by ID, just in case of any weird edge cases.
+        if (oldContractsResult.status === 'fulfilled') {
+            const oldContracts = oldContractsResult.value.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+            allContracts.push(...oldContracts);
+        } else {
+            console.warn('Could not load contracts from the old `users/{uid}/contracts` subcollection (this may be expected after migration):', oldContractsResult.reason);
+        }
+
+        // If both failed, alert the user.
+        if (newContractsResult.status === 'rejected' && oldContractsResult.status === 'rejected') {
+             alert('Falha total ao carregar contratos. Verifique as permissões da base de dados e a sua ligação à Internet.');
+             return [];
+        }
+        
+        // Combine, sort, and deduplicate
+        allContracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         return Array.from(new Map(allContracts.map(item => [item.id, item])).values());
         
     } catch (error) {
-        console.error('Error loading contracts from Firestore:', error);
-        alert('Falha ao carregar contratos. Verifique a sua ligação à Internet.');
+        // This outer catch is for any other unexpected errors.
+        console.error('An unexpected error occurred while loading contracts:', error);
+        alert('Ocorreu um erro inesperado ao carregar os contratos.');
         return [];
     }
 };
