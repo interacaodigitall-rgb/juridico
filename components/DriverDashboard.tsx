@@ -37,7 +37,7 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, userProfile, on
     if (loading) return <LoadingSpinner />;
 
     if (selectedContract) {
-        return <SignView contract={selectedContract} onBack={handleBackToList} />;
+        return <SignView contract={selectedContract} onBack={handleBackToList} driverUid={user.uid} />;
     }
 
     return (
@@ -88,7 +88,7 @@ const ContractList: React.FC<{ title: string; contracts: SavedContract[]; onActi
     </div>
 );
 
-const SignView: React.FC<{ contract: SavedContract; onBack: () => void; }> = ({ contract, onBack }) => {
+const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUid: string; }> = ({ contract, onBack, driverUid }) => {
     const [isSigned, setIsSigned] = useState(false);
     const [loading, setLoading] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -167,7 +167,13 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; }> = ({ 
         const isComplete = allSigners.every(signer => newSignatures[signer]);
 
         try {
-            await updateContractSignatures(contract.id, newSignatures, isComplete ? 'completed' : 'pending_signature');
+            await updateContractSignatures(
+                contract.id, 
+                newSignatures, 
+                isComplete ? 'completed' : 'pending_signature',
+                driverUid,
+                contract.adminUid
+            );
             setIsSigned(true);
         } catch (e) {
             alert("Erro ao guardar assinatura.");

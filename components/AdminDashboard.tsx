@@ -97,20 +97,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         setCompletedSteps(prev => new Set([...prev, Step.Sign]));
     };
 
-    const handleSignComplete = async (signatures: Signatures) => {
+    const handleFinalizeContract = async (signatures: Signatures, driverEmail: string, action: 'send' | 'finalize') => {
         if (!contractType || !user) return;
         setSyncStatus('syncing');
 
-        const driverEmail = formData.DRIVER_EMAIL;
         const driverPasswordSuggestion = '0123456';
 
         try {
-            // 1. Encontrar ou criar o motorista
+            // 1. Encontrar o perfil do motorista para obter o UID
             let driverProfile = await findUserByEmail(driverEmail);
             
             if (!driverProfile) {
-                // Se o motorista não existe, instruir o admin a criá-lo.
-                 const shouldCreate = window.confirm(`Não foi encontrada uma conta para o motorista com o e-mail ${driverEmail}.\n\nPara prosseguir, uma conta precisa de ser criada para ele na consola do Firebase.\n\nUse a palavra-passe temporária: ${driverPasswordSuggestion}\n\nO motorista poderá usá-la para aceder e assinar. Clique em 'OK' se já criou a conta e quer tentar novamente.`);
+                const shouldCreate = window.confirm(`Não foi encontrada uma conta para o motorista com o e-mail ${driverEmail}.\n\nPara prosseguir, uma conta precisa de ser criada para ele na consola do Firebase.\n\nUse a palavra-passe temporária: ${driverPasswordSuggestion}\n\nO motorista poderá usá-la para aceder e assinar. Clique em 'OK' se já criou a conta e quer tentar novamente.`);
                 if (shouldCreate) {
                     driverProfile = await findUserByEmail(driverEmail);
                     if (!driverProfile) {
@@ -120,31 +118,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                     throw new Error("Criação de contrato cancelada. Crie a conta do motorista primeiro.");
                 }
             }
+            
+            const currentTemplate = contractTemplates[contractType];
+            const allSignaturesCollected = Object.keys(signatures).length >= currentTemplate.signatures.length;
+            
+            let contractStatus: SavedContract['status'] = 'pending_signature';
+            if (action === 'finalize' && allSignaturesCollected) {
+                contractStatus = 'completed';
+            }
 
-            // 2. Preparar e guardar o contrato na coleção global
+            // 2. Preparar e guardar o contrato usando o novo serviço
             const newContract: Omit<SavedContract, 'id'> = {
                 type: contractType,
-                title: contractTemplates[contractType].title,
-                data: formData,
-                signatures, // Admin pode pré-assinar
+                title: currentTemplate.title,
+                data: { ...formData, DRIVER_EMAIL: driverEmail }, // Store email for reference
+                signatures,
                 createdAt: new Date().toISOString(),
                 adminUid: user.uid,
                 driverUid: driverProfile.uid,
                 driverEmail: driverProfile.email,
-                status: Object.keys(signatures).length >= contractTemplates[contractType].signatures.length ? 'completed' : 'pending_signature',
+                status: contractStatus,
             };
             
             await saveContract(newContract);
             
-            // 3. Gerar PDF se todas as assinaturas estiverem presentes (assinatura local)
-             if (newContract.status === 'completed') {
-                await generateFinalPDF(contractTemplates[contractType], formData, signatures, contractType);
-                alert('🎉 Sucesso! Contrato assinado localmente, gerado e arquivado para o motorista.');
-            } else {
+            // 3. Gerar PDF se finalizado localmente ou notificar o envio
+            if (action === 'finalize') {
+                if (allSignaturesCollected) {
+                    await generateFinalPDF(currentTemplate, newContract.data, signatures, contractType);
+                    alert('🎉 Sucesso! Contrato assinado, PDF gerado e arquivado.');
+                } else {
+                    alert('⚠️ Aviso! O PDF não foi gerado porque faltam assinaturas. O contrato foi guardado como pendente.');
+                }
+            } else { // action === 'send'
                 alert('✅ Sucesso! Contrato enviado para o portal do motorista para assinatura.');
             }
 
-            // 4. Atualizar a lista e voltar ao início
+            // 4. Atualizar a lista local e voltar ao início
             const updatedContracts = await loadContracts(user.uid, 'admin');
             setContracts(updatedContracts);
             setSyncStatus('synced');
@@ -189,8 +199,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 return <PreviewContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Form)} onNext={handlePreviewAccept} contractType={contractType} />;
             case Step.Sign:
                 if (!contractType) return null;
-                // A assinatura agora é mais um ato de 'enviar' ou 'finalizar'
-                return <SignContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Preview)} onComplete={handleSignComplete} contractType={contractType} />;
+                return <SignContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Preview)} onFinalize={handleFinalizeContract} contractType={contractType} />;
             case Step.Manage:
                 return <ManageContracts contracts={contracts} onDelete={handleDeleteContract} onEdit={handleEditContract} onNew={resetProcess}/>;
             default:

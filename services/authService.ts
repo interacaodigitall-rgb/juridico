@@ -82,6 +82,10 @@ export const findUserByEmail = async (email: string): Promise<UserProfile | null
         return null;
     } catch (error) {
         console.error("Error finding user by email:", error);
+        // Fallback for permission errors
+        if (error.code === 'permission-denied' || error.message.includes('insufficient permissions')) {
+             alert("Erro de permissão ao procurar utilizador. Verifique as regras de segurança do Firestore. O administrador deve poder ler a coleção 'users'.");
+        }
         return null;
     }
 };

@@ -17,87 +17,73 @@ declare global {
 // Declara o objeto global do Firebase para que o TypeScript o reconheça
 declare const firebase: any;
 
-// --- Firestore Service (New Structure) ---
+// --- Firestore Service (Refactored to User Subcollections) ---
 
-const contractsRef = firestore.collection('contracts');
 const signatureRequestsRef = firestore.collection('signatureRequests');
 
 export const loadContracts = async (uid: string, role: 'admin' | 'driver'): Promise<SavedContract[]> => {
-    if (role === 'driver') {
-        try {
-            const snapshot = await contractsRef
-                .where('driverUid', '==', uid)
-                .where('status', '==', 'pending_signature')
-                .orderBy('createdAt', 'desc')
-                .get();
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-        } catch (error) {
-            console.error('Error loading driver contracts from Firestore:', error);
-            alert('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet.');
-            return [];
-        }
-    }
-
-    // --- Admin Loading Logic (Backward Compatibility & Resilient) ---
     try {
-        const newContractsPromise = contractsRef.where('adminUid', '==', uid).get();
-        const oldContractsRef = firestore.collection('users').doc(uid).collection('contracts');
-        const oldContractsPromise = oldContractsRef.get();
-        
-        const results = await Promise.allSettled([newContractsPromise, oldContractsPromise]);
+        const contractsRef = firestore.collection('users').doc(uid).collection('contracts');
+        let query = contractsRef.orderBy('createdAt', 'desc');
 
-        const newContractsResult = results[0];
-        const oldContractsResult = results[1];
-        let allContracts: SavedContract[] = [];
-
-        if (newContractsResult.status === 'fulfilled') {
-            const newContracts = newContractsResult.value.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-            allContracts.push(...newContracts);
-        } else {
-            console.error('Error loading contracts from the new `contracts` collection:', newContractsResult.reason);
-        }
-        
-        if (oldContractsResult.status === 'fulfilled') {
-            const oldContracts = oldContractsResult.value.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-            allContracts.push(...oldContracts);
-        } else {
-            console.warn('Could not load contracts from the old `users/{uid}/contracts` subcollection (this may be expected after migration):', oldContractsResult.reason);
+        // Drivers only see contracts pending their signature
+        if (role === 'driver') {
+            query = query.where('status', '==', 'pending_signature');
         }
 
-        // If both failed, alert the user.
-        if (newContractsResult.status === 'rejected' && oldContractsResult.status === 'rejected') {
-             alert('Falha total ao carregar contratos. Verifique as permissões da base de dados e a sua ligação à Internet.');
-             return [];
-        }
-        
-        // Combine, sort, and deduplicate
-        allContracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return Array.from(new Map(allContracts.map(item => [item.id, item])).values());
-        
+        const snapshot = await query.get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+
     } catch (error) {
-        // This outer catch is for any other unexpected errors.
-        console.error('An unexpected error occurred while loading contracts:', error);
-        alert('Ocorreu um erro inesperado ao carregar os contratos.');
+        console.error(`Error loading ${role} contracts from subcollection:`, error);
+        alert('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet e as permissões da base de dados.');
         return [];
     }
 };
 
 export const saveContract = async (contractData: Omit<SavedContract, 'id'>): Promise<string> => {
     try {
-        const docRef = await contractsRef.add(contractData);
-        return docRef.id;
+        const batch = firestore.batch();
+        const newContractId = firestore.collection('users').doc().id;
+
+        // Save a copy for the Admin
+        const adminRef = firestore.collection('users').doc(contractData.adminUid).collection('contracts').doc(newContractId);
+        batch.set(adminRef, contractData);
+
+        // Save a copy for the Driver
+        const driverRef = firestore.collection('users').doc(contractData.driverUid).collection('contracts').doc(newContractId);
+        batch.set(driverRef, contractData);
+
+        await batch.commit();
+        return newContractId;
+
     } catch (error) {
-        console.error('Error saving contract to Firestore:', error);
+        console.error('Error saving contract to subcollections:', error);
         throw new Error('Falha ao guardar o contrato na nuvem.');
     }
 };
 
-export const updateContractSignatures = async (contractId: string, signatures: Signatures, status: ContractStatus): Promise<void> => {
+export const updateContractSignatures = async (
+    contractId: string, 
+    signatures: Signatures, 
+    status: ContractStatus,
+    driverUid: string,
+    adminUid: string
+): Promise<void> => {
     try {
-        await contractsRef.doc(contractId).update({
-            signatures,
-            status,
-        });
+        const batch = firestore.batch();
+        const updatePayload = { signatures, status };
+
+        // Update driver's copy
+        const driverRef = firestore.collection('users').doc(driverUid).collection('contracts').doc(contractId);
+        batch.update(driverRef, updatePayload);
+        
+        // Update admin's copy to keep it in sync
+        const adminRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
+        batch.update(adminRef, updatePayload);
+
+        await batch.commit();
+
     } catch (error) {
         console.error('Error updating contract signatures:', error);
         throw new Error('Falha ao atualizar as assinaturas do contrato.');
@@ -106,22 +92,18 @@ export const updateContractSignatures = async (contractId: string, signatures: S
 
 
 export const deleteContract = async (contractId: string, adminUid: string): Promise<void> => {
-    // To support deleting old contracts, we must try deleting from both locations.
     try {
-        const newRef = firestore.collection('contracts').doc(contractId);
-        const oldRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
-        
-        // Deleting a non-existent doc doesn't throw an error, so this is safe.
-        // One of these will delete the document.
-        await Promise.all([newRef.delete(), oldRef.delete()]);
-
+        // In the new model, only the admin has contracts to delete from their view.
+        // We could also delete the driver's copy, but let's keep it simple.
+        const contractRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
+        await contractRef.delete();
     } catch (error) {
         console.error('Error deleting contract from Firestore:', error);
         throw new Error('Falha ao apagar o contrato.');
     }
 };
 
-// --- Signature Request Service ---
+// --- Signature Request Service (for remote signing link, logic remains similar) ---
 
 export const createSignatureRequest = async (
     adminUid: string, 
