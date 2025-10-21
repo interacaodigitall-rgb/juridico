@@ -1,10 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest } from '../types';
 import { empresaData } from '../constants';
-// FIX: Renamed the imported 'firebase' module to 'firebaseApp' to prevent potential naming conflicts
-// with the global 'firebase' object provided by the Firebase SDK script. This resolves an issue
-// where 'firebase.firestore.FieldValue' was undefined, causing remote signature request creation to fail.
-import { firestore, firebase as firebaseApp } from '../firebase';
+import { firestore } from '../firebase';
 
 
 declare global {
@@ -16,6 +13,9 @@ declare global {
         };
     }
 }
+
+// Declara o objeto global do Firebase para que o TypeScript o reconheça
+declare const firebase: any;
 
 // --- Firestore Service ---
 
@@ -291,8 +291,9 @@ export const downloadPdf = (pdfDataUri: string, title: string, date: string) => 
 export const createSignatureRequest = async (userId: string, contractType: ContractType, formData: FormData, signers: string[]): Promise<string> => {
     try {
         const signatureRequestsRef = firestore.collection('signatureRequests');
-        const createdAt = firebaseApp.firestore.FieldValue.serverTimestamp();
-        const expiresAt = firebaseApp.firestore.Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000); // 48 hours expiration
+        // FIX: Use the global firebase object directly to ensure access to firestore static properties
+        const createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        const expiresAt = firebase.firestore.Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000); // 48 hours expiration
 
         const newRequest = {
             userId,
