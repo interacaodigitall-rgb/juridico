@@ -161,7 +161,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         if (!user) return;
         setSyncStatus('syncing');
         try {
-            await deleteContract(id);
+            await deleteContract(id, user.uid);
             setContracts(prev => prev.filter(c => c.id !== id));
             setSyncStatus('synced');
         } catch(error) {

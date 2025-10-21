@@ -24,15 +24,34 @@ const signatureRequestsRef = firestore.collection('signatureRequests');
 
 export const loadContracts = async (uid: string, role: 'admin' | 'driver'): Promise<SavedContract[]> => {
     try {
-        const queryField = role === 'admin' ? 'adminUid' : 'driverUid';
-        const snapshot = await contractsRef.where(queryField, '==', uid).orderBy('createdAt', 'desc').get();
-        if (snapshot.empty) {
-            return [];
+        if (role === 'driver') {
+            // Drivers only read from the new global collection, which is correct.
+            const snapshot = await contractsRef.where('driverUid', '==', uid).orderBy('createdAt', 'desc').get();
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
         }
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        } as SavedContract));
+
+        // --- Admin Loading Logic (Backward Compatibility) ---
+        // Admin loads from BOTH the new global collection and the old user-specific subcollection.
+
+        // 1. Fetch from new global 'contracts' collection
+        const newContractsPromise = contractsRef.where('adminUid', '==', uid).get();
+        
+        // 2. Fetch from old 'users/{uid}/contracts' subcollection
+        const oldContractsRef = firestore.collection('users').doc(uid).collection('contracts');
+        const oldContractsPromise = oldContractsRef.get();
+        
+        const [newSnapshot, oldSnapshot] = await Promise.all([newContractsPromise, oldContractsPromise]);
+        
+        const newContracts = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+        const oldContracts = oldSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+
+        // 3. Combine, sort, and return all contracts
+        const allContracts = [...newContracts, ...oldContracts];
+        allContracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        
+        // Basic deduplication by ID, just in case of any weird edge cases.
+        return Array.from(new Map(allContracts.map(item => [item.id, item])).values());
+        
     } catch (error) {
         console.error('Error loading contracts from Firestore:', error);
         alert('Falha ao carregar contratos. Verifique a sua ligação à Internet.');
@@ -63,9 +82,16 @@ export const updateContractSignatures = async (contractId: string, signatures: S
 };
 
 
-export const deleteContract = async (contractId: string): Promise<void> => {
+export const deleteContract = async (contractId: string, adminUid: string): Promise<void> => {
+    // To support deleting old contracts, we must try deleting from both locations.
     try {
-        await contractsRef.doc(contractId).delete();
+        const newRef = firestore.collection('contracts').doc(contractId);
+        const oldRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
+        
+        // Deleting a non-existent doc doesn't throw an error, so this is safe.
+        // One of these will delete the document.
+        await Promise.all([newRef.delete(), oldRef.delete()]);
+
     } catch (error) {
         console.error('Error deleting contract from Firestore:', error);
         throw new Error('Falha ao apagar o contrato.');
