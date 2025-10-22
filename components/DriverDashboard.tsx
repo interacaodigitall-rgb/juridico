@@ -17,10 +17,10 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, userProfile, on
 
     const fetchContracts = useCallback(() => {
         setLoading(true);
-        loadContracts(user.uid, 'driver')
+        loadContracts(user.uid, userProfile.role)
             .then(setContracts)
             .finally(() => setLoading(false));
-    }, [user.uid]);
+    }, [user.uid, userProfile.role]);
 
     useEffect(() => {
         fetchContracts();
@@ -32,14 +32,17 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, userProfile, on
 
     const handleBackToList = () => {
         setSelectedContract(null);
-        fetchContracts();
+        fetchContracts(); // Recarrega os contratos para refletir o novo estado
     };
 
     if (loading) return <LoadingSpinner />;
 
     if (selectedContract) {
-        return <SignView contract={selectedContract} onBack={handleBackToList} driverUid={user.uid} />;
+        return <SignView contract={selectedContract} onBack={handleBackToList} />;
     }
+
+    const pendingContracts = contracts.filter(c => c.status === 'pending_signature' && getPendingRolesForDriver(c).length > 0);
+    const completedContracts = contracts.filter(c => c.status === 'completed');
 
     return (
         <div className="p-4 sm:p-6">
@@ -53,7 +56,8 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, userProfile, on
                 </div>
 
                 <div className="space-y-10">
-                    <ContractList title="Documentos para Assinar" contracts={contracts} onAction={handleSignContract} actionLabel="Rever e Assinar" />
+                    <PendingContractList contracts={pendingContracts} onSign={handleSignContract} />
+                    <CompletedContractList contracts={completedContracts} />
                 </div>
             </div>
         </div>
@@ -63,11 +67,8 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, userProfile, on
 // --- Sub-componentes para o DriverDashboard ---
 const getPendingRolesForDriver = (contract: SavedContract): { key: string, label: string }[] => {
     const template = contractTemplates[contract.type];
-    // The name of the logged-in driver as per the contract data.
     const driverName = contract.data.NOME_MOTORISTA;
 
-    // Define the roles a user in the driver portal can possibly sign for.
-    // We explicitly exclude "REPRESENTANTE_NOME" as it's handled by the admin.
     const possibleDriverRoles = [
         { key: "NOME_MOTORISTA", label: "Motorista" },
         { key: "NOME_PROPRIETARIO", label: "Proprietário" },
@@ -76,57 +77,90 @@ const getPendingRolesForDriver = (contract: SavedContract): { key: string, label
     const pendingRoles: { key: string, label: string }[] = [];
 
     for (const role of possibleDriverRoles) {
-        // Check if this role is required for this specific contract type
         const isRoleRequired = template.signatures.includes(role.key);
-        // Check if this role has already been signed
         const isRoleSigned = !!contract.signatures[role.key];
-        // Check if the name assigned to this role in the contract matches the logged-in driver's name
         const isDriverAssignedToRole = contract.data[role.key] === driverName;
 
         if (isRoleRequired && !isRoleSigned && isDriverAssignedToRole) {
             pendingRoles.push({ key: role.key, label: role.label });
         }
     }
-
     return pendingRoles;
 };
 
-
-const ContractList: React.FC<{ title: string; contracts: SavedContract[]; onAction: (c: SavedContract) => void; actionLabel: string; }> = ({ title, contracts, onAction, actionLabel }) => (
+const PendingContractList: React.FC<{ contracts: SavedContract[]; onSign: (c: SavedContract) => void; }> = ({ contracts, onSign }) => (
     <div>
-        <h2 className="text-2xl font-semibold text-gray-200 mb-4 border-b-2 border-gray-700 pb-2">{title}</h2>
+        <h2 className="text-2xl font-semibold text-gray-200 mb-4 border-b-2 border-gray-700 pb-2">Documentos para Assinar</h2>
         {contracts.length === 0 ? (
-            <div className="text-center py-10">
+            <div className="text-center py-10 glass-effect rounded-lg">
                 <div className="text-5xl mb-4">👍</div>
                 <h3 className="text-xl font-bold text-gray-300">Tudo em ordem!</h3>
-                <p className="text-gray-400">De momento, não tem contratos pendentes para assinar.</p>
+                <p className="text-gray-400">De momento, não tem contratos pendentes.</p>
             </div>
         ) : (
             <div className="space-y-4">
-                {contracts.map(contract => {
-                    const pendingRoles = getPendingRolesForDriver(contract);
-                    const buttonLabel = pendingRoles.length > 0 
-                        ? `Assinar como ${pendingRoles.map(r => r.label).join(' e ')}`
-                        : actionLabel;
-
-                    return (
-                        <div key={contract.id} className="glass-effect rounded-lg p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                            <div>
-                                <h3 className="font-bold text-lg text-gray-100">{contract.title}</h3>
-                                <p className="text-sm text-gray-400">Recebido em: {new Date(contract.createdAt).toLocaleDateString('pt-PT')}</p>
-                            </div>
-                            <button onClick={() => onAction(contract)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold w-full sm:w-auto">
-                                {buttonLabel}
-                            </button>
+                {contracts.map(contract => (
+                    <div key={contract.id} className="glass-effect rounded-lg p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h3 className="font-bold text-lg text-gray-100">{contract.title}</h3>
+                            <p className="text-sm text-gray-400">Recebido em: {new Date(contract.createdAt).toLocaleDateString('pt-PT')}</p>
                         </div>
-                    );
-                })}
+                        <button onClick={() => onSign(contract)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold w-full sm:w-auto">
+                            Rever e Assinar
+                        </button>
+                    </div>
+                ))}
             </div>
         )}
     </div>
 );
 
-const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUid: string; }> = ({ contract, onBack, driverUid }) => {
+const CompletedContractList: React.FC<{ contracts: SavedContract[]; }> = ({ contracts }) => {
+    const handleDownload = async (contract: SavedContract) => {
+        const template = contractTemplates[contract.type];
+        if (!template) {
+            alert('Template de contrato não encontrado!');
+            return;
+        }
+        try {
+            alert('A gerar o PDF. O download começará em breve...');
+            await generateFinalPDF(template, contract.data, contract.signatures, contract.type);
+        } catch (error) {
+            console.error("Failed to regenerate PDF:", error);
+            alert("Falha ao gerar o PDF. Tente novamente.");
+        }
+    };
+
+    return (
+        <div>
+            <h2 className="text-2xl font-semibold text-gray-200 mb-4 border-b-2 border-gray-700 pb-2">Arquivo de Contratos Concluídos</h2>
+            {contracts.length === 0 ? (
+                <div className="text-center py-10 glass-effect rounded-lg">
+                    <div className="text-5xl mb-4">📂</div>
+                    <h3 className="text-xl font-bold text-gray-300">Arquivo Vazio</h3>
+                    <p className="text-gray-400">Ainda não tem contratos concluídos.</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {contracts.map(contract => (
+                        <div key={contract.id} className="glass-effect rounded-lg p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div>
+                                <h3 className="font-bold text-lg text-gray-100">{contract.title}</h3>
+                                <p className="text-sm text-gray-400">Concluído em: {new Date(contract.createdAt).toLocaleDateString('pt-PT')}</p>
+                            </div>
+                            <button onClick={() => handleDownload(contract)} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold w-full sm:w-auto">
+                                Baixar PDF
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
+const SignView: React.FC<{ contract: SavedContract; onBack: () => void; }> = ({ contract, onBack }) => {
     const [currentContract, setCurrentContract] = useState(contract);
     const [loading, setLoading] = useState(false);
     const [selectedRole, setSelectedRole] = useState<{ key: string, label: string } | null>(null);
@@ -239,19 +273,24 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
 
         try {
             await updateContractSignatures(
-                currentContract.id, 
+                currentContract.id,
+                currentContract.adminUid,
                 newSignatures, 
-                isComplete ? 'completed' : 'pending_signature',
-                driverUid,
-                currentContract.adminUid
+                isComplete ? 'completed' : 'pending_signature'
             );
-            setCurrentContract(prev => ({ ...prev, signatures: newSignatures }));
-            // Select next role or null if done
-            const nextRoles = getPendingRolesForDriver({ ...currentContract, signatures: newSignatures });
-            setSelectedRole(nextRoles[0] || null);
+            
+            const updatedContractState = { ...currentContract, signatures: newSignatures, status: isComplete ? 'completed' : 'pending_signature' } as SavedContract;
+            setCurrentContract(updatedContractState);
+            
+            const nextRoles = getPendingRolesForDriver(updatedContractState);
+            if (nextRoles.length > 0) {
+                 setSelectedRole(nextRoles[0]);
+            } else {
+                 setSelectedRole(null);
+            }
 
         } catch (e) {
-            alert("Erro ao guardar assinatura.");
+            alert(e instanceof Error ? e.message : "Erro ao guardar assinatura.");
         } finally {
             setLoading(false);
         }

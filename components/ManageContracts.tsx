@@ -5,7 +5,7 @@ import { contractTemplates } from '../constants';
 
 interface ManageContractsProps {
     contracts: SavedContract[];
-    onDelete: (id: string) => void;
+    onDelete: (contract: SavedContract) => void;
     onEdit: (contract: SavedContract) => void;
     onNew: () => void;
 }
@@ -74,7 +74,13 @@ const ManageContracts: React.FC<ManageContractsProps> = ({ contracts, onDelete, 
                                     <div key={contract.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-6 hover:border-gray-600 transition-all duration-300">
                                         <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                                             <div className="flex-1">
-                                                <h4 className="font-bold text-xl text-gray-100 mb-1">{contract.title}</h4>
+                                                <div className="flex items-center gap-3 mb-1">
+                                                    <h4 className="font-bold text-xl text-gray-100">{contract.title}</h4>
+                                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${contract.status === 'completed' ? 'bg-green-600/30 text-green-300' : 'bg-yellow-600/30 text-yellow-300'}`}>
+                                                        {contract.status === 'completed' ? 'Concluído' : 'Pendente'}
+                                                    </span>
+                                                </div>
+
                                                 <p className="text-gray-400 text-sm mb-3">
                                                     Criado em: {new Date(contract.createdAt).toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                 </p>
@@ -94,7 +100,7 @@ const ManageContracts: React.FC<ManageContractsProps> = ({ contracts, onDelete, 
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                                     <span>Baixar</span>
                                                 </button>
-                                                <button onClick={() => { if(window.confirm('Tem a certeza que deseja excluir este contrato?')) { onDelete(contract.id) }}} className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2">
+                                                <button onClick={() => { if(window.confirm('Tem a certeza que deseja excluir este contrato?')) { onDelete(contract) }}} className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-2">
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                                     <span>Excluir</span>
                                                 </button>

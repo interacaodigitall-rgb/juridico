@@ -43,6 +43,7 @@ export interface SavedContract {
     driverUid: string;
     driverEmail: string;
     status: ContractStatus;
+    participantUids: string[];
 }
 
 export interface SignatureRequest {

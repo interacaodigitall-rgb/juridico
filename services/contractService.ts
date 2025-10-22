@@ -1,5 +1,6 @@
+
 import { jsPDF } from 'jspdf';
-import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest, ContractStatus } from '../types';
+import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest, ContractStatus, UserRole } from '../types';
 import { empresaData } from '../constants';
 import { firestore } from '../firebase';
 
@@ -14,98 +15,143 @@ declare global {
     }
 }
 
+/**
+ * Erro personalizado para indicar que uma consulta do Firestore falhou devido a um índice em falta.
+ * Contém o link direto para a criação do índice necessário.
+ */
+export class FirestoreIndexError extends Error {
+    public readonly indexCreationLink: string;
+
+    constructor(message: string, link: string) {
+        super(message);
+        this.name = 'FirestoreIndexError';
+        this.indexCreationLink = link;
+    }
+}
+
+
 // Declara o objeto global do Firebase para que o TypeScript o reconheça
 declare const firebase: any;
 
-// --- Firestore Service (Refactored to User Subcollections) ---
+// --- Firestore Service (Refactored for subcollection structure) ---
 
 const signatureRequestsRef = firestore.collection('signatureRequests');
 
-export const loadContracts = async (uid: string, role: 'admin' | 'driver'): Promise<SavedContract[]> => {
+/**
+ * Carrega os contratos para um determinado utilizador (admin ou motorista).
+ * - Admins: Carrega os contratos da sua própria sub-coleção.
+ * - Motoristas: Utiliza uma consulta de grupo de coleções para encontrar todos os contratos
+ *   em que são participantes, independentemente de qual admin os criou.
+ * @param uid O ID do utilizador autenticado.
+ * @param role O papel do utilizador ('admin' ou 'driver').
+ * @returns Uma promessa que resolve para uma lista de contratos.
+ * @throws {FirestoreIndexError} se a consulta requerer um índice que não existe.
+ */
+export const loadContracts = async (uid: string, role: UserRole): Promise<SavedContract[]> => {
     try {
-        const contractsRef = firestore.collection('users').doc(uid).collection('contracts');
-        // A consulta para obter contratos, sempre ordenados por data de criação.
-        const query = contractsRef.orderBy('createdAt', 'desc');
+        // FIX: Changed type from `firebase.firestore.Query` to `any` to resolve "Cannot find namespace 'firebase'" error.
+        let query: any;
 
-        const snapshot = await query.get();
-        const allContracts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-
-        // Se o utilizador for um motorista, filtramos os contratos no lado do cliente.
-        // Isto evita a necessidade de um índice composto no Firestore, que estava a causar o erro.
-        if (role === 'driver') {
-            return allContracts.filter(contract => contract.status === 'pending_signature');
+        if (role === 'admin') {
+            // Admin carrega apenas os contratos que criou (na sua sub-coleção)
+            query = firestore.collection('users').doc(uid).collection('contracts');
+        } else {
+            // Motorista precisa de uma consulta de grupo para encontrar os seus contratos em todas as sub-coleções
+            query = firestore.collectionGroup('contracts').where('participantUids', 'array-contains', uid);
         }
         
-        // O administrador vê todos os contratos.
-        return allContracts;
+        const snapshot = await query.get();
+        const contracts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+        
+        contracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        return contracts;
 
     } catch (error: any) {
-        console.error(`Error loading ${role} contracts from subcollection:`, error);
-        // Mensagem de erro melhorada para detetar problemas de índice futuros.
-        if (error.code === 'failed-precondition' && error.message && error.message.includes('index')) {
-             alert('Ocorreu um erro de configuração da base de dados (índice em falta). Por favor, contacte o suporte técnico se o problema persistir.');
-        } else {
-             alert('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet e as permissões da base de dados.');
-        }
-        return [];
+         console.error(`Error loading contracts for UID ${uid} with role ${role}:`, error);
+
+        if (error.code === 'failed-precondition' && error.message?.includes('https://console.firebase.google.com')) {
+            const urlRegex = /(https?:\/\/[^\s]+)/;
+            const match = error.message.match(urlRegex);
+            const indexCreationLink = match?.[0]?.replace(/\\"/g, '') || '#';
+            
+            const userMessage = 'AÇÃO NECESSÁRIA: A base de dados precisa de uma otimização.\n\n' +
+                    'Por favor, siga estes passos:\n' +
+                    '1. Clique no link abaixo para abrir a consola do Firebase (abrirá num novo separador).\n' +
+                    '2. Na página que abrir, clique no botão "Criar Índice".\n' +
+                    '3. Aguarde 1-2 minutos para o índice ser ativado.\n' +
+                    '4. Volte aqui e clique em "Tentar Novamente".';
+
+            throw new FirestoreIndexError(userMessage, indexCreationLink);
+        
+        } else if (error.code === 'permission-denied') {
+             throw new Error('Erro de permissão. Contacte o administrador para verificar as regras de segurança da base de dados.');
+        } 
+        
+        throw new Error('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet e tente novamente.');
     }
 };
 
+/**
+ * Guarda um novo contrato na sub-coleção do administrador que o criou.
+ * @param contractData Os dados do contrato a guardar.
+ * @returns O ID do novo documento do contrato.
+ */
 export const saveContract = async (contractData: Omit<SavedContract, 'id'>): Promise<string> => {
     try {
-        const batch = firestore.batch();
-        const newContractId = firestore.collection('users').doc().id;
-
-        // Save a copy for the Admin
-        const adminRef = firestore.collection('users').doc(contractData.adminUid).collection('contracts').doc(newContractId);
-        batch.set(adminRef, contractData);
-
-        // Save a copy for the Driver
-        const driverRef = firestore.collection('users').doc(contractData.driverUid).collection('contracts').doc(newContractId);
-        batch.set(driverRef, contractData);
-
-        await batch.commit();
-        return newContractId;
-
+        const docRef = await firestore
+            .collection('users')
+            .doc(contractData.adminUid)
+            .collection('contracts')
+            .add(contractData);
+        return docRef.id;
     } catch (error) {
-        console.error('Error saving contract to subcollections:', error);
+        console.error('Error saving contract to Firestore:', error);
         throw new Error('Falha ao guardar o contrato na nuvem.');
     }
 };
 
+/**
+ * Atualiza as assinaturas e o estado de um contrato existente.
+ * @param contractId O ID do contrato a ser atualizado.
+ * @param adminUid O ID do admin que criou o contrato (para encontrar a sub-coleção correta).
+ * @param signatures O objeto de assinaturas atualizado.
+ * @param status O novo estado do contrato.
+ */
 export const updateContractSignatures = async (
-    contractId: string, 
-    signatures: Signatures, 
-    status: ContractStatus,
-    driverUid: string,
-    adminUid: string
+    contractId: string,
+    adminUid: string,
+    signatures: Signatures,
+    status: ContractStatus
 ): Promise<void> => {
     try {
-        const batch = firestore.batch();
-        const updatePayload = { signatures, status };
-
-        // Update driver's copy
-        const driverRef = firestore.collection('users').doc(driverUid).collection('contracts').doc(contractId);
-        batch.update(driverRef, updatePayload);
-        
-        // Update admin's copy to keep it in sync
-        const adminRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
-        batch.update(adminRef, updatePayload);
-
-        await batch.commit();
-
-    } catch (error) {
+        const contractRef = firestore
+            .collection('users')
+            .doc(adminUid)
+            .collection('contracts')
+            .doc(contractId);
+        await contractRef.update({ signatures, status });
+    } catch (error: any) {
         console.error('Error updating contract signatures:', error);
+        if (error.code === 'permission-denied') {
+            throw new Error("Permissão negada. Certifique-se de que tem permissão para assinar este contrato.");
+        }
         throw new Error('Falha ao atualizar as assinaturas do contrato.');
     }
 };
 
-
+/**
+ * Apaga um contrato da base de dados.
+ * @param contractId O ID do contrato a ser apagado.
+ * @param adminUid O ID do admin que criou o contrato.
+ */
 export const deleteContract = async (contractId: string, adminUid: string): Promise<void> => {
     try {
-        // In the new model, only the admin has contracts to delete from their view.
-        // We could also delete the driver's copy, but let's keep it simple.
-        const contractRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
+        const contractRef = firestore
+            .collection('users')
+            .doc(adminUid)
+            .collection('contracts')
+            .doc(contractId);
         await contractRef.delete();
     } catch (error) {
         console.error('Error deleting contract from Firestore:', error);
@@ -225,7 +271,7 @@ export const updateSignature = async (
 };
 
 
-// --- PDF Generation Service (No changes needed here, but kept for completeness) ---
+// --- PDF Generation Service (Refactored for better layout) ---
 
 export const generateFinalPDF = async (template: ContractTemplate, formData: FormData, signatures: Signatures, contractType: ContractType): Promise<{ pdfBlob: Blob, pdfDataUri: string }> => {
     if (!window.jspdf || !window.jspdf.jsPDF) {
@@ -254,114 +300,61 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     const title = contentLines.find(line => line.trim() !== '') || template.title;
     const body = contentLines.slice(contentLines.indexOf(title) + 1).join('\n');
 
-    let renderConfigs;
-    if (contractType === 'uber') {
-        renderConfigs = [
-             { id: 'uber-special', fontSize: 9.8, lineHeight: 4.8, margin: 20, yStart: 25 },
-        ];
-    } else {
-        renderConfigs = [
-            { id: 'default', fontSize: 12, lineHeight: 6, margin: 15, yStart: 30 },
-            { id: 'compact', fontSize: 11.5, lineHeight: 5.8, margin: 15, yStart: 28 },
-            { id: 'extra-compact', fontSize: 11, lineHeight: 5.5, margin: 12, yStart: 25 },
-            { id: 'super-compact', fontSize: 10.5, lineHeight: 5.3, margin: 12, yStart: 25 }
-        ];
-    }
+    // Use a single, consistent config for readability
+    const config = contractType === 'uber' 
+        ? { fontSize: 9.8, lineHeight: 4.8, margin: 20, yStart: 25 }
+        : { fontSize: 11, lineHeight: 5.5, margin: 20, yStart: 25 };
 
-    let finalDoc: jsPDF | null = null;
-    let finalConfig = renderConfigs[0];
-    let finalY = 0;
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const contentWidth = pageWidth - (config.margin * 2);
+    let y = config.yStart;
+
+    // Render Title
+    doc.setFont('times', 'bold');
+    doc.setFontSize(config.fontSize + 2);
+    const titleLines = doc.splitTextToSize(title, contentWidth);
+    doc.text(titleLines, pageWidth / 2, y, { align: 'center' });
+    y += (titleLines.length * (config.lineHeight + 1)) + 10;
+
+    // Render Body
+    doc.setFont('times', 'normal');
+    doc.setFontSize(config.fontSize);
+    const bodyLines = doc.splitTextToSize(body, contentWidth);
+    
+    bodyLines.forEach((line: string) => {
+        if (y > pageHeight - config.margin - 10) { 
+            doc.addPage();
+            y = config.yStart;
+        }
+        doc.text(line, config.margin, y);
+        y += config.lineHeight;
+    });
+
+    // --- Reworked Signature Placement Logic ---
 
     const signatureWidth = 70;
     const signatureHeight = 35;
-    const singleSignatureHeight = contractType === 'uber' ? 55 : 60;
-    const signatureBlockHeight = (template.signatures.length * singleSignatureHeight);
+    // Estimate a generous, consistent height for each signature block (image + text)
+    const singleSignatureBlockHeight = 60; 
+    const totalSignaturesHeight = template.signatures.length * singleSignatureBlockHeight;
+    const spaceBeforeSignatures = 15;
 
-    for (const config of renderConfigs) {
-        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const contentWidth = pageWidth - (config.margin * 2);
-        let y = config.yStart;
-
-        doc.setFont('times', 'bold');
-        doc.setFontSize(config.fontSize + 2);
-        const titleLines = doc.splitTextToSize(title, contentWidth);
-        doc.text(titleLines, pageWidth / 2, y, { align: 'center' });
-        y += (titleLines.length * (config.lineHeight + 1)) + 10;
-
-        doc.setFont('times', 'normal');
-        doc.setFontSize(config.fontSize);
-        const bodyLines = doc.splitTextToSize(body, contentWidth);
-        
-        bodyLines.forEach((line: string) => {
-            if (y > pageHeight - config.margin - 10) { 
-                doc.addPage();
-                y = config.yStart;
-            }
-            doc.text(line, config.margin, y);
-            y += config.lineHeight;
-        });
-
-        const availableSpace = pageHeight - y - config.margin;
-        if (signatureBlockHeight <= availableSpace) {
-            finalDoc = doc;
-            finalConfig = config;
-            finalY = y;
-            break; 
-        }
+    // Check if the entire signature block fits on the current page. If not, add a new page.
+    if (y + spaceBeforeSignatures + totalSignaturesHeight > pageHeight - config.margin) {
+        doc.addPage();
+        y = config.yStart; // Reset y for the new page
     }
-    
-    if (!finalDoc) {
-        finalConfig = renderConfigs[renderConfigs.length - 1];
-        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const contentWidth = pageWidth - (finalConfig.margin * 2);
-        let y = finalConfig.yStart;
-
-        doc.setFont('times', 'bold');
-        doc.setFontSize(finalConfig.fontSize + 2);
-        const titleLines = doc.splitTextToSize(title, contentWidth);
-        doc.text(titleLines, pageWidth / 2, y, { align: 'center' });
-        y += (titleLines.length * (finalConfig.lineHeight + 1)) + 10;
-
-        doc.setFont('times', 'normal');
-        doc.setFontSize(finalConfig.fontSize);
-        const bodyLines = doc.splitTextToSize(body, contentWidth);
-        
-        bodyLines.forEach((line: string) => {
-            if (y > pageHeight - finalConfig.margin - 10) {
-                doc.addPage();
-                y = finalConfig.yStart;
-            }
-            doc.text(line, finalConfig.margin, y);
-            y += finalConfig.lineHeight;
-        });
-        
-        finalDoc = doc;
-        finalY = y;
-    }
-    
-    const doc = finalDoc;
-    let y = finalY;
-    const { margin } = finalConfig;
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    const spaceBeforeSignatures = contractType === 'uber' ? 12 : 15;
-    const signerNameFontSize = contractType === 'uber' ? 8.5 : 9;
-    const textLineHeightFactor = contractType === 'uber' ? 3.0 : 3.5;
-    const spaceAfterSignature = contractType === 'uber' ? 7 : 10;
     
     y += spaceBeforeSignatures;
 
-    template.signatures.forEach((signerName) => {
-         if (y + singleSignatureHeight > pageHeight - margin) {
-            doc.addPage();
-            y = finalConfig.yStart; 
-        }
+    // Render signatures
+    const signerNameFontSize = contractType === 'uber' ? 8.5 : 9;
+    const textLineHeightFactor = contractType === 'uber' ? 3.0 : 3.5;
+    const spaceAfterSignature = contractType === 'uber' ? 7 : 10;
 
+    template.signatures.forEach((signerName) => {
         const signatureDataUrl = signatures[signerName];
         let signatureBlockText = '';
         doc.setFontSize(signerNameFontSize);
@@ -384,20 +377,30 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         const centeredSignatureX = (pageWidth - signatureWidth) / 2;
         if (signatureDataUrl) {
             try {
+                // The signature image is placed first
                 doc.addImage(signatureDataUrl, 'PNG', centeredSignatureX, y, signatureWidth, signatureHeight);
+                // The text is placed below the image
+                const textY = y + signatureHeight + 5; 
+                const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (config.margin * 2));
+                doc.text(textLines, pageWidth / 2, textY, { align: 'center' });
+                y = textY + (textLines.length * textLineHeightFactor) + spaceAfterSignature;
+
             } catch (e) {
                 console.warn('Error adding signature image:', e);
                 doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight);
                 doc.text('Signature Error', centeredSignatureX + 5, y + 15);
+                y += singleSignatureBlockHeight;
             }
+        } else {
+             // If no signature, just draw the text block and advance y
+             const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (config.margin * 2));
+             const placeholderY = y + signatureHeight / 2; // Center text in placeholder area
+             doc.text(textLines, pageWidth / 2, placeholderY, { align: 'center' });
+             y += singleSignatureBlockHeight;
         }
-        y += signatureHeight + 2;
-
-        const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (margin * 2));
-        doc.text(textLines, pageWidth / 2, y, { align: 'center' });
-        y += (textLines.length * textLineHeightFactor) + spaceAfterSignature;
     });
 
+    // --- Footer and Page Numbering Logic ---
     const totalPages = (doc.internal as any).pages.length;
     const currentCompanyData = empresaData;
 
@@ -407,18 +410,8 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
 
-        const footerText = currentCompanyData.NOME_EMPRESA;
+        const footerText = `${currentCompanyData.NOME_EMPRESA} | Página ${i} de ${totalPages}`;
         doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
-
-        if (totalPages > 1 && i < totalPages) {
-            const stampText = `DOCUMENTO ASSINADO EM ${new Date().toLocaleDateString('pt-PT')}`;
-            const stampY = pageHeight - 17;
-            const textWidth = doc.getTextWidth(stampText);
-            
-            doc.setDrawColor(150, 150, 150);
-            doc.roundedRect((pageWidth - textWidth) / 2 - 2, stampY - 4, textWidth + 4, 6, 2, 2, 'S');
-            doc.text(stampText, pageWidth / 2, stampY, { align: 'center' });
-        }
     }
 
     doc.setPage(totalPages);
@@ -427,7 +420,7 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     const pdfBlob = doc.output('blob');
     const pdfDataUri = doc.output('datauristring');
     
-    const fileName = `${template.title.replace(/\s+/g, '_')}_${formData.DATA_ASSINATURA || new Date().toISOString().split('T')[0]}.pdf`;
+    const fileName = `${template.title.replace(/\s+/g, '_')}_${formData.DATA_ASSINatura || new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
 
     return { pdfBlob, pdfDataUri };
