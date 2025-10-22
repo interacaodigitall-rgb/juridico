@@ -94,6 +94,14 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
 
+    useEffect(() => {
+        const originalStyle = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = originalStyle;
+        };
+    }, []);
+
     const template = contractTemplates[contract.type];
     let previewContent = template.template;
     Object.entries(contract.data).forEach(([key, value]) => {
@@ -194,20 +202,22 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
     }
 
     return (
-        <div className="container mx-auto max-w-4xl py-6">
-            <button onClick={onBack} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg mb-6">← Voltar à Lista</button>
-            <div className="glass-effect rounded-xl p-6">
-                 <h2 className="text-2xl font-bold mb-4 text-gray-100">{contract.title}</h2>
-                <div className="bg-white rounded-lg p-6 max-h-[50vh] overflow-y-auto shadow-inner mb-6">
-                    <div dangerouslySetInnerHTML={{ __html: formattedContent }} style={{ fontFamily: "'Times New Roman', serif", color: 'black' }} />
-                </div>
-                <h3 className="text-xl font-bold text-white mb-4">Sua Assinatura</h3>
-                 <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} className="w-full h-48 rounded-lg cursor-crosshair bg-white" />
-                <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                    <button onClick={clearCanvas} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg">Limpar</button>
-                    <button onClick={handleSubmitSignature} disabled={loading} className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50">
-                        {loading ? "Aguarde..." : "Confirmar e Assinar Contrato"}
-                    </button>
+        <div className="fixed inset-0 bg-gray-900 z-50 overflow-y-auto p-4 sm:p-6 md:p-8">
+            <div className="container mx-auto max-w-4xl">
+                <button onClick={onBack} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg mb-6">← Voltar à Lista</button>
+                <div className="glass-effect rounded-xl p-6">
+                     <h2 className="text-2xl font-bold mb-4 text-gray-100">{contract.title}</h2>
+                    <div className="bg-white rounded-lg p-6 max-h-[50vh] overflow-y-auto shadow-inner mb-6">
+                        <div dangerouslySetInnerHTML={{ __html: formattedContent }} style={{ fontFamily: "'Times New Roman', serif", color: 'black' }} />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-4">Sua Assinatura</h3>
+                     <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} className="w-full h-48 rounded-lg cursor-crosshair bg-white touch-action-none" />
+                    <div className="mt-6 flex flex-col sm:flex-row gap-4">
+                        <button onClick={clearCanvas} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg">Limpar</button>
+                        <button onClick={handleSubmitSignature} disabled={loading} className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50">
+                            {loading ? "Aguarde..." : "Confirmar e Assinar Contrato"}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -150,18 +150,16 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
 
     // --- Modals ---
     const LocalSignatureModal = (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-xl w-full max-w-3xl h-full max-h-[90vh] p-4 sm:p-6 flex flex-col">
-                <div className="mb-4">
-                    <h3 className="text-xl font-bold text-white">Área de Assinatura</h3>
-                    <p className="text-gray-400">Assinando como: <span className="font-semibold text-blue-400">{formData[currentSigner || ''] || currentSigner}</span></p>
-                </div>
-                <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} className="w-full h-full rounded-lg cursor-crosshair bg-white flex-grow" />
-                <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                    <button onClick={() => setIsLocalSignModalOpen(false)} className="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold">Cancelar</button>
-                    <button onClick={clearCanvas} className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Limpar</button>
-                    <button onClick={handleSaveLocalSignature} className="w-full sm:w-auto flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold">Confirmar Assinatura</button>
-                </div>
+        <div className="fixed inset-0 bg-gray-800 z-50 p-4 sm:p-6 flex flex-col">
+            <div className="mb-4">
+                <h3 className="text-xl font-bold text-white">Área de Assinatura</h3>
+                <p className="text-gray-400">Assinando como: <span className="font-semibold text-blue-400">{formData[currentSigner || ''] || currentSigner}</span></p>
+            </div>
+            <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} className="w-full h-full rounded-lg cursor-crosshair bg-white flex-grow touch-action-none" />
+            <div className="mt-6 flex flex-col sm:flex-row gap-4">
+                <button onClick={() => setIsLocalSignModalOpen(false)} className="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold">Cancelar</button>
+                <button onClick={clearCanvas} className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Limpar</button>
+                <button onClick={handleSaveLocalSignature} className="w-full sm:w-auto flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold">Confirmar Assinatura</button>
             </div>
         </div>
     );

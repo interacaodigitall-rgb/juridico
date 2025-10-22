@@ -193,7 +193,7 @@ const RemoteSign: React.FC = () => {
                         onTouchStart={startDrawing}
                         onTouchMove={draw}
                         onTouchEnd={stopDrawing}
-                        className="w-full h-48 rounded-lg cursor-crosshair bg-white"
+                        className="w-full h-48 rounded-lg cursor-crosshair bg-white touch-action-none"
                     />
                     <div className="mt-6 flex flex-col sm:flex-row gap-4">
                         <button onClick={clearCanvas} className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300">Limpar</button>
