@@ -272,9 +272,9 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     let finalConfig = renderConfigs[0];
     let finalY = 0;
 
-    const signatureWidth = 55;
-    const signatureHeight = 22;
-    const singleSignatureHeight = contractType === 'uber' ? 36 : 40; 
+    const signatureWidth = 70;
+    const signatureHeight = 35;
+    const singleSignatureHeight = contractType === 'uber' ? 55 : 60;
     const signatureBlockHeight = (template.signatures.length * singleSignatureHeight);
 
     for (const config of renderConfigs) {
@@ -363,8 +363,6 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         }
 
         const signatureDataUrl = signatures[signerName];
-        if (!signatureDataUrl) return;
-
         let signatureBlockText = '';
         doc.setFontSize(signerNameFontSize);
         doc.setFont('times', 'normal');
@@ -383,19 +381,21 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
             signatureBlockText = `Pelo Motorista:\n${allData.NOME_MOTORISTA}`;
         }
         
+        const centeredSignatureX = (pageWidth - signatureWidth) / 2;
+        if (signatureDataUrl) {
+            try {
+                doc.addImage(signatureDataUrl, 'PNG', centeredSignatureX, y, signatureWidth, signatureHeight);
+            } catch (e) {
+                console.warn('Error adding signature image:', e);
+                doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight);
+                doc.text('Signature Error', centeredSignatureX + 5, y + 15);
+            }
+        }
+        y += signatureHeight + 2;
+
         const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (margin * 2));
         doc.text(textLines, pageWidth / 2, y, { align: 'center' });
-        y += (textLines.length * textLineHeightFactor) + 2;
-
-        const centeredSignatureX = (pageWidth - signatureWidth) / 2;
-        try {
-            doc.addImage(signatureDataUrl, 'PNG', centeredSignatureX, y, signatureWidth, signatureHeight);
-        } catch (e) {
-            console.warn('Error adding signature image:', e);
-            doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight);
-            doc.text('Signature Error', centeredSignatureX + 5, y + 15);
-        }
-        y += signatureHeight + spaceAfterSignature;
+        y += (textLines.length * textLineHeightFactor) + spaceAfterSignature;
     });
 
     const totalPages = (doc.internal as any).pages.length;
