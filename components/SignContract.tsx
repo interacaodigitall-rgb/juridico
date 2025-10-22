@@ -11,20 +11,12 @@ interface SignContractProps {
     onFinalize: (signatures: Signatures, driverEmail: string, action: 'send' | 'finalize') => void;
 }
 
-type FinalizeAction = 'send' | 'finalize';
-
 const SignContract: React.FC<SignContractProps> = ({ template, formData, contractType, onBack, onFinalize }) => {
     const [signatures, setSignatures] = useState<Signatures>({});
     const [signatureRequestId, setSignatureRequestId] = useState<string | null>(null);
 
     const [isLocalSignModalOpen, setIsLocalSignModalOpen] = useState(false);
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-    
-    // State for the new email modal
-    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-    const [driverEmail, setDriverEmail] = useState('');
-    const [emailError, setEmailError] = useState('');
-    const [finalizeAction, setFinalizeAction] = useState<FinalizeAction | null>(null);
     
     const [currentSigner, setCurrentSigner] = useState<string | null>(null);
     const [linkToCopy, setLinkToCopy] = useState('');
@@ -46,23 +38,6 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
         return () => unsubscribe();
     }, [signatureRequestId]);
 
-    // --- New Email Modal Logic ---
-    const handleOpenEmailModal = (action: FinalizeAction) => {
-        setFinalizeAction(action);
-        setIsEmailModalOpen(true);
-    };
-
-    const handleConfirmEmail = () => {
-        if (!driverEmail || !/\S+@\S+\.\S+/.test(driverEmail)) {
-            setEmailError('Por favor, insira um e-mail válido.');
-            return;
-        }
-        setEmailError('');
-        setIsEmailModalOpen(false);
-        if (finalizeAction) {
-            onFinalize(signatures, driverEmail, finalizeAction);
-        }
-    };
     
     // --- Remote Link Logic ---
     const handleGenerateRemoteLink = async () => {
@@ -103,13 +78,13 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
 
     useEffect(() => {
         const originalStyle = document.body.style.overflow;
-        if (isLocalSignModalOpen || isLinkModalOpen || isEmailModalOpen) {
+        if (isLocalSignModalOpen || isLinkModalOpen) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = originalStyle;
         }
         return () => { document.body.style.overflow = originalStyle; };
-    }, [isLocalSignModalOpen, isLinkModalOpen, isEmailModalOpen]);
+    }, [isLocalSignModalOpen, isLinkModalOpen]);
 
     const clearCanvas = useCallback(() => {
         const canvas = canvasRef.current;
@@ -206,40 +181,11 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
             </div>
         </div>
     );
-    
-    const EmailModal = (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-xl w-full max-w-md p-6">
-                <h3 className="text-2xl font-bold text-white mb-4">Atribuir Contrato ao Motorista</h3>
-                <p className="text-gray-300 mb-6">Insira o e-mail do motorista para associar este contrato à sua conta no portal.</p>
-                <div>
-                    <label htmlFor="driver-email" className="block text-sm font-semibold text-gray-300 mb-2">
-                        E-mail do Motorista
-                    </label>
-                    <input
-                        type="email"
-                        id="driver-email"
-                        value={driverEmail}
-                        onChange={(e) => setDriverEmail(e.target.value)}
-                        required
-                        className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 transition-all duration-300 ${emailError ? 'border-red-500 ring-red-500' : 'border-gray-600 focus:ring-blue-500'}`}
-                        placeholder="email.motorista@exemplo.com"
-                    />
-                    {emailError && <p className="text-red-400 text-sm mt-2">{emailError}</p>}
-                </div>
-                <div className="mt-6 flex gap-4">
-                    <button onClick={() => setIsEmailModalOpen(false)} className="w-full px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold">Cancelar</button>
-                    <button onClick={handleConfirmEmail} className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">Confirmar</button>
-                </div>
-            </div>
-        </div>
-    );
 
     return (
         <>
             {isLocalSignModalOpen && LocalSignatureModal}
             {isLinkModalOpen && LinkModal}
-            {isEmailModalOpen && EmailModal}
 
             <div className="glass-effect rounded-xl p-8 fade-in">
                 <h2 className="text-3xl font-bold mb-2 text-gray-100">Assinatura Digital</h2>
@@ -285,11 +231,11 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
                 <div className="mt-10 flex flex-col sm:flex-row justify-between gap-4">
                     <button onClick={onBack} className="w-full sm:w-auto px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold">Voltar</button>
                     <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-4">
-                        <button onClick={() => handleOpenEmailModal('send')} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300">
+                        <button onClick={() => onFinalize(signatures, 'assinatura@asfaltocativante.pt', 'send')} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300">
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                             <span>Enviar para Portal</span>
                         </button>
-                         <button onClick={() => handleOpenEmailModal('finalize')} disabled={!allLocalSignaturesCollected} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-600 disabled:to-gray-700">
+                         <button onClick={() => onFinalize(signatures, 'assinatura@asfaltocativante.pt', 'finalize')} disabled={!allLocalSignaturesCollected} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-600 disabled:to-gray-700">
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             <span>Gerar PDF Final</span>
                         </button>
