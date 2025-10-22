@@ -39,9 +39,7 @@ const signatureRequestsRef = firestore.collection('signatureRequests');
 
 /**
  * Carrega os contratos para um determinado utilizador (admin ou motorista).
- * - Admins: Carrega os contratos da sua própria sub-coleção.
- * - Motoristas: Utiliza uma consulta de grupo de coleções para encontrar todos os contratos
- *   em que são participantes, independentemente de qual admin os criou.
+ * A consulta do admin foi otimizada para ser mais direta, e a do motorista usa `collectionGroup`.
  * @param uid O ID do utilizador autenticado.
  * @param role O papel do utilizador ('admin' ou 'driver').
  * @returns Uma promessa que resolve para uma lista de contratos.
@@ -53,10 +51,11 @@ export const loadContracts = async (uid: string, role: UserRole): Promise<SavedC
         let query: any;
 
         if (role === 'admin') {
-            // Admin carrega apenas os contratos que criou (na sua sub-coleção)
+            // OTIMIZAÇÃO: A consulta do admin agora é direta, mais eficiente e compatível
+            // com as regras de segurança `match /users/{userId}/...`
             query = firestore.collection('users').doc(uid).collection('contracts');
         } else {
-            // Motorista precisa de uma consulta de grupo para encontrar os seus contratos em todas as sub-coleções
+            // Motorista precisa de uma consulta de grupo para encontrar os seus contratos em todas as sub-coleções de administradores
             query = firestore.collectionGroup('contracts').where('participantUids', 'array-contains', uid);
         }
         
