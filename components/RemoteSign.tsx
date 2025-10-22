@@ -11,7 +11,9 @@ const RemoteSign: React.FC = () => {
     const [signerToSign, setSignerToSign] = useState<string | null>(null);
     const [isSigned, setIsSigned] = useState(false);
     
-    const requestId = new URLSearchParams(window.location.search).get('sign');
+    const hash = window.location.hash.substring(1);
+    const hashSearchParams = new URLSearchParams(hash.startsWith('?') ? hash.substring(1) : hash);
+    const requestId = hashSearchParams.get('sign');
 
     useEffect(() => {
         if (!requestId) {
@@ -85,12 +87,10 @@ const RemoteSign: React.FC = () => {
 
     useEffect(() => {
         if (request && !error) {
-             document.body.style.overflow = 'hidden';
             const timer = setTimeout(calibrateCanvas, 50);
             window.addEventListener('resize', calibrateCanvas);
 
             return () => {
-                document.body.style.overflow = 'auto';
                 window.removeEventListener('resize', calibrateCanvas);
                 clearTimeout(timer);
             };
@@ -175,9 +175,9 @@ const RemoteSign: React.FC = () => {
     }
 
     return (
-        <div className="bg-gray-900 min-h-screen text-gray-200 font-sans flex flex-col p-4">
-            <div className="text-center mb-4">
-                <h1 className="text-3xl font-bold text-gray-100">
+        <div className="bg-gray-900 h-screen text-gray-200 font-sans flex flex-col p-2 sm:p-4 overflow-hidden">
+            <div className="text-center mb-4 flex-shrink-0">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-100">
                     Assinatura de Documento
                 </h1>
                 <p className="text-gray-400">
@@ -185,35 +185,39 @@ const RemoteSign: React.FC = () => {
                 </p>
             </div>
 
-            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 mb-4 overflow-hidden flex-shrink min-h-0">
-                <h2 className="text-xl font-bold mb-2 text-gray-100">{request ? contractTemplates[request.contractType].title : ''}</h2>
-                <div className="bg-white rounded-lg p-4 h-full overflow-y-auto shadow-inner">
-                    <div 
-                        className="text-black"
-                        style={{ fontFamily: "'Times New Roman', serif", lineHeight: 1.6, fontSize: '12px', textAlign: 'justify' }}
-                        dangerouslySetInnerHTML={{ __html: formattedContent }}
-                    />
+            <div className="flex-grow flex flex-col md:flex-row gap-4 min-h-0">
+                {/* Painel de Pré-visualização */}
+                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 flex flex-col md:w-1/2 overflow-hidden">
+                    <h2 className="text-xl font-bold mb-2 text-gray-100 flex-shrink-0">{request ? contractTemplates[request.contractType].title : ''}</h2>
+                    <div className="bg-white rounded-lg p-4 h-full overflow-y-auto shadow-inner">
+                        <div 
+                            className="text-black"
+                            style={{ fontFamily: "'Times New Roman', serif", lineHeight: 1.6, fontSize: '12px', textAlign: 'justify' }}
+                            dangerouslySetInnerHTML={{ __html: formattedContent }}
+                        />
+                    </div>
                 </div>
-            </div>
-
-            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 flex flex-col flex-grow">
-                 <h3 className="text-lg font-bold text-white mb-2 text-center">Sua Assinatura</h3>
-                 <div className="flex-grow w-full h-full min-h-[150px]">
-                    <canvas
-                        ref={canvasRef}
-                        onMouseDown={startDrawing}
-                        onMouseMove={draw}
-                        onMouseUp={stopDrawing}
-                        onMouseLeave={stopDrawing}
-                        onTouchStart={startDrawing}
-                        onTouchMove={draw}
-                        onTouchEnd={stopDrawing}
-                        className="w-full h-full rounded-lg cursor-crosshair bg-white touch-none"
-                    />
-                 </div>
-                <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                    <button onClick={clearCanvas} className="w-full sm:w-auto px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300">Limpar</button>
-                    <button onClick={handleSubmitSignature} className="w-full sm:w-auto flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-300">Confirmar e Enviar</button>
+                
+                {/* Painel de Assinatura */}
+                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 flex flex-col md:w-1/2">
+                    <h3 className="text-lg font-bold text-white mb-2 text-center flex-shrink-0">Sua Assinatura</h3>
+                    <div className="flex-grow w-full h-full min-h-[150px]">
+                        <canvas
+                            ref={canvasRef}
+                            onMouseDown={startDrawing}
+                            onMouseMove={draw}
+                            onMouseUp={stopDrawing}
+                            onMouseLeave={stopDrawing}
+                            onTouchStart={startDrawing}
+                            onTouchMove={draw}
+                            onTouchEnd={stopDrawing}
+                            className="w-full h-full rounded-lg cursor-crosshair bg-white touch-none"
+                        />
+                    </div>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                        <button onClick={clearCanvas} className="w-full sm:w-auto px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300">Limpar</button>
+                        <button onClick={handleSubmitSignature} className="w-full sm:w-auto flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-300">Confirmar e Enviar</button>
+                    </div>
                 </div>
             </div>
         </div>

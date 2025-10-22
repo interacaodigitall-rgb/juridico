@@ -12,8 +12,7 @@ import {
     generateFinalPDF, 
     loadContracts,
     saveContract,
-    deleteContract,
-    FirestoreIndexError
+    deleteContract
 } from '../services/contractService';
 import { findUserByEmail } from '../services/authService';
 
@@ -69,33 +68,6 @@ const InstructionModal = ({ email, onClose, onRetry }: { email: string, onClose:
 };
 
 
-const IndexCreationModal = ({ link, onRetry }: { link: string, onRetry: () => void }) => (
-    <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4 fade-in">
-        <div className="bg-gray-800 rounded-xl w-full max-w-2xl p-8 text-center border-2 border-yellow-500 shadow-2xl">
-            <div className="text-5xl mb-4">⚙️</div>
-            <h3 className="text-2xl font-bold text-yellow-300 mb-4">Ação Necessária para Otimizar a Base de Dados</h3>
-            <p className="text-gray-300 mb-6">
-                Para carregar os contratos eficientemente, o Firestore precisa de um índice. Esta é uma configuração única e segura.
-            </p>
-            <div className="space-y-4 text-gray-200 bg-gray-900/50 p-6 rounded-lg border border-gray-700 text-left">
-                <p><strong>1.</strong> Clique no link abaixo para abrir a consola do Firebase (abrirá num novo separador).</p>
-                <a href={link} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline break-all block text-center py-2 bg-gray-700 rounded-lg">
-                    Criar Índice no Firebase →
-                </a>
-                <p><strong>2.</strong> Na página que abrir, simplesmente clique no botão <strong>"Criar"</strong>.</p>
-                <p><strong>3.</strong> Aguarde 1 a 2 minutos para que o estado do índice mude para "Ativo".</p>
-                <p><strong>4.</strong> Volte aqui e clique no botão "Tentar Novamente".</p>
-            </div>
-            <div className="mt-8">
-                <button onClick={onRetry} className="w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-300 text-lg">
-                    Tentar Novamente
-                </button>
-            </div>
-        </div>
-    </div>
-);
-
-
 const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogout }) => {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
     const [step, setStep] = useState<Step>(Step.Manage);
@@ -104,7 +76,6 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
     const [formData, setFormData] = useState<FormData>({});
     const [contracts, setContracts] = useState<SavedContract[]>([]);
     
-    const [indexCreationLink, setIndexCreationLink] = useState<string | null>(null);
     const [isInstructionModalOpen, setIsInstructionModalOpen] = useState(false);
     const [driverEmailForModal, setDriverEmailForModal] = useState('');
     const [retryPayload, setRetryPayload] = useState<{ signatures: Signatures; action: 'send' | 'finalize' } | null>(null);
@@ -115,19 +86,14 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
             return;
         }
         setSyncStatus('syncing');
-        setIndexCreationLink(null); // Limpa o erro antes de tentar novamente
 
-        loadContracts(user.uid, 'admin')
+        loadContracts(user.uid)
             .then(data => {
                 setContracts(data);
                 setSyncStatus('synced');
             })
             .catch((err) => {
-                if (err instanceof FirestoreIndexError) {
-                    setIndexCreationLink(err.indexCreationLink);
-                } else {
-                    alert(err.message || 'Ocorreu um erro desconhecido ao carregar os contratos.');
-                }
+                alert(err.message || 'Ocorreu um erro desconhecido ao carregar os contratos.');
                 setSyncStatus('error');
             });
     }, [user]);
@@ -239,7 +205,7 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
         if (!user) return;
         setSyncStatus('syncing');
         try {
-            await deleteContract(contract.id, contract.adminUid);
+            await deleteContract(contract.id, contract.adminUid, contract.driverUid);
             setContracts(prev => prev.filter(c => c.id !== contract.id));
             setSyncStatus('synced');
         } catch(error) {
@@ -256,11 +222,6 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
     };
 
     const renderStep = () => {
-        if (indexCreationLink) {
-            // Se o erro do índice existir, não renderizar mais nada exceto o modal
-            return null;
-        }
-
         switch (step) {
             case Step.Select:
                 return <SelectContract onSelect={handleSelectContract} />;
@@ -289,9 +250,6 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
                     onClose={() => setIsInstructionModalOpen(false)}
                     onRetry={handleRetryFinalize}
                 />
-            )}
-            {indexCreationLink && (
-                <IndexCreationModal link={indexCreationLink} onRetry={fetchContracts} />
             )}
             <div className="container mx-auto px-4 py-6 max-w-7xl">
                 <Header user={user} onLogout={onLogout} syncStatus={syncStatus} />

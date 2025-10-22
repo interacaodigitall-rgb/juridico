@@ -48,7 +48,8 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
         try {
             const requestId = await createSignatureRequest(auth.currentUser.uid, contractType, formData, signers);
             setSignatureRequestId(requestId);
-            const url = `${window.location.origin}${window.location.pathname}?sign=${requestId}`;
+            const baseUrl = window.location.href.split('#')[0].split('?')[0];
+            const url = `${baseUrl}#?sign=${requestId}`;
             setLinkToCopy(url);
             setIsLinkModalOpen(true);
         } catch (error) {
@@ -81,19 +82,22 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        
+
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(dpr, dpr);
-        
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#000000';
+
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#111827';
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, rect.width, rect.height);
     }, []);
     
     const clearCanvas = useCallback(() => {
@@ -101,7 +105,6 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        // The canvas is already scaled, so we clear based on its CSS dimensions
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     }, []);
@@ -109,7 +112,6 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
     useEffect(() => {
         if (isLocalSignModalOpen) {
             document.body.style.overflow = 'hidden';
-            // Delay calibration slightly to ensure modal CSS is applied
             const timer = setTimeout(calibrateCanvas, 50);
             window.addEventListener('resize', calibrateCanvas);
 

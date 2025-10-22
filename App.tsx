@@ -13,7 +13,9 @@ const App: React.FC = () => {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
 
-    const isRemoteSignFlow = new URLSearchParams(window.location.search).has('sign');
+    const hash = window.location.hash.substring(1);
+    const hashSearchParams = new URLSearchParams(hash.startsWith('?') ? hash.substring(1) : hash);
+    const isRemoteSignFlow = hashSearchParams.has('sign');
 
     useEffect(() => {
         if (!auth) {

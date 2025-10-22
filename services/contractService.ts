@@ -1,4 +1,5 @@
 
+
 import { jsPDF } from 'jspdf';
 import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest, ContractStatus, UserRole } from '../types';
 import { empresaData } from '../constants';
@@ -15,123 +16,93 @@ declare global {
     }
 }
 
-/**
- * Erro personalizado para indicar que uma consulta do Firestore falhou devido a um índice em falta.
- * Contém o link direto para a criação do índice necessário.
- */
-export class FirestoreIndexError extends Error {
-    public readonly indexCreationLink: string;
-
-    constructor(message: string, link: string) {
-        super(message);
-        this.name = 'FirestoreIndexError';
-        this.indexCreationLink = link;
-    }
-}
-
-
 // Declara o objeto global do Firebase para que o TypeScript o reconheça
 declare const firebase: any;
 
-// --- Firestore Service (Refactored for subcollection structure) ---
-
-const signatureRequestsRef = firestore.collection('signatureRequests');
+// --- Firestore Service (Refactored for a duplicated data model with sync) ---
 
 /**
- * Carrega os contratos para um determinado utilizador (admin ou motorista).
- * A consulta do admin foi otimizada para ser mais direta, e a do motorista usa `collectionGroup`.
- * @param uid O ID do utilizador autenticado.
- * @param role O papel do utilizador ('admin' ou 'driver').
- * @returns Uma promessa que resolve para uma lista de contratos.
- * @throws {FirestoreIndexError} se a consulta requerer um índice que não existe.
+ * Carrega contratos da sub-coleção do utilizador especificado.
+ * Esta abordagem é segura e funciona com regras de segurança baseadas no UID.
+ * @param uid O ID do utilizador autenticado (admin ou motorista).
+ * @returns Uma promessa que resolve para uma lista dos contratos do utilizador.
  */
-export const loadContracts = async (uid: string, role: UserRole): Promise<SavedContract[]> => {
+export const loadContracts = async (uid: string): Promise<SavedContract[]> => {
     try {
-        // FIX: Changed type from `firebase.firestore.Query` to `any` to resolve "Cannot find namespace 'firebase'" error.
-        let query: any;
-
-        if (role === 'admin') {
-            // OTIMIZAÇÃO: A consulta do admin agora é direta, mais eficiente e compatível
-            // com as regras de segurança `match /users/{userId}/...`
-            query = firestore.collection('users').doc(uid).collection('contracts');
-        } else {
-            // Motorista precisa de uma consulta de grupo para encontrar os seus contratos em todas as sub-coleções de administradores
-            query = firestore.collectionGroup('contracts').where('participantUids', 'array-contains', uid);
-        }
+        const userContractsRef = firestore.collection('users').doc(uid).collection('contracts');
+        const snapshot = await userContractsRef.get();
         
-        const snapshot = await query.get();
         const contracts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
         
         contracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
         return contracts;
 
     } catch (error: any) {
-         console.error(`Error loading contracts for UID ${uid} with role ${role}:`, error);
-
-        if (error.code === 'failed-precondition' && error.message?.includes('https://console.firebase.google.com')) {
-            const urlRegex = /(https?:\/\/[^\s]+)/;
-            const match = error.message.match(urlRegex);
-            const indexCreationLink = match?.[0]?.replace(/\\"/g, '') || '#';
-            
-            const userMessage = 'AÇÃO NECESSÁRIA: A base de dados precisa de uma otimização.\n\n' +
-                    'Por favor, siga estes passos:\n' +
-                    '1. Clique no link abaixo para abrir a consola do Firebase (abrirá num novo separador).\n' +
-                    '2. Na página que abrir, clique no botão "Criar Índice".\n' +
-                    '3. Aguarde 1-2 minutos para o índice ser ativado.\n' +
-                    '4. Volte aqui e clique em "Tentar Novamente".';
-
-            throw new FirestoreIndexError(userMessage, indexCreationLink);
-        
-        } else if (error.code === 'permission-denied') {
-             throw new Error('Erro de permissão. Contacte o administrador para verificar as regras de segurança da base de dados.');
-        } 
-        
+        console.error(`Error loading contracts for UID ${uid}:`, error.message);
+        if (error.code === 'permission-denied' || error.message.includes('insufficient permissions')) {
+            throw new Error('Erro de permissão. Contacte o administrador para verificar as regras de segurança da base de dados.');
+        }
         throw new Error('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet e tente novamente.');
     }
 };
 
 /**
- * Guarda um novo contrato na sub-coleção do administrador que o criou.
- * @param contractData Os dados do contrato a guardar.
- * @returns O ID do novo documento do contrato.
+ * Guarda um novo contrato, criando cópias duplicadas para o admin e o motorista usando um batch write.
+ * @param contractData Os dados do contrato a guardar (deve incluir adminUid e driverUid).
+ * @returns O ID do novo contrato.
  */
 export const saveContract = async (contractData: Omit<SavedContract, 'id'>): Promise<string> => {
     try {
-        const docRef = await firestore
-            .collection('users')
-            .doc(contractData.adminUid)
-            .collection('contracts')
-            .add(contractData);
-        return docRef.id;
+        const batch = firestore.batch();
+        
+        // Gera um ID único para o contrato
+        const newContractRef = firestore.collection('users').doc().collection('contracts').doc();
+        const newContractId = newContractRef.id;
+
+        const adminContractRef = firestore.collection('users').doc(contractData.adminUid).collection('contracts').doc(newContractId);
+        const driverContractRef = firestore.collection('users').doc(contractData.driverUid).collection('contracts').doc(newContractId);
+        
+        batch.set(adminContractRef, contractData);
+        batch.set(driverContractRef, contractData);
+        
+        await batch.commit();
+        return newContractId;
+
     } catch (error) {
-        console.error('Error saving contract to Firestore:', error);
+        console.error('Error saving contract with batch write:', error);
         throw new Error('Falha ao guardar o contrato na nuvem.');
     }
 };
 
 /**
- * Atualiza as assinaturas e o estado de um contrato existente.
+ * Atualiza as assinaturas e o estado de um contrato, sincronizando as cópias do admin e do motorista.
  * @param contractId O ID do contrato a ser atualizado.
- * @param adminUid O ID do admin que criou o contrato (para encontrar a sub-coleção correta).
  * @param signatures O objeto de assinaturas atualizado.
  * @param status O novo estado do contrato.
+ * @param adminUid O UID do administrador do contrato.
+ * @param driverUid O UID do motorista do contrato.
  */
 export const updateContractSignatures = async (
     contractId: string,
-    adminUid: string,
     signatures: Signatures,
-    status: ContractStatus
+    status: ContractStatus,
+    adminUid: string,
+    driverUid: string
 ): Promise<void> => {
     try {
-        const contractRef = firestore
-            .collection('users')
-            .doc(adminUid)
-            .collection('contracts')
-            .doc(contractId);
-        await contractRef.update({ signatures, status });
+        const batch = firestore.batch();
+        const updateData = { signatures, status };
+
+        const adminContractRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
+        const driverContractRef = firestore.collection('users').doc(driverUid).collection('contracts').doc(contractId);
+
+        batch.update(adminContractRef, updateData);
+        batch.update(driverContractRef, updateData);
+
+        await batch.commit();
+
     } catch (error: any) {
-        console.error('Error updating contract signatures:', error);
+        console.error('Error updating contract signatures with batch write:', error);
         if (error.code === 'permission-denied') {
             throw new Error("Permissão negada. Certifique-se de que tem permissão para assinar este contrato.");
         }
@@ -140,25 +111,35 @@ export const updateContractSignatures = async (
 };
 
 /**
- * Apaga um contrato da base de dados.
+ * Apaga um contrato das sub-coleções do admin e do motorista.
  * @param contractId O ID do contrato a ser apagado.
- * @param adminUid O ID do admin que criou o contrato.
+ * @param adminUid O UID do administrador do contrato.
+ * @param driverUid O UID do motorista do contrato.
  */
-export const deleteContract = async (contractId: string, adminUid: string): Promise<void> => {
+export const deleteContract = async (contractId: string, adminUid: string, driverUid: string): Promise<void> => {
     try {
-        const contractRef = firestore
-            .collection('users')
-            .doc(adminUid)
-            .collection('contracts')
-            .doc(contractId);
-        await contractRef.delete();
+        const batch = firestore.batch();
+
+        const adminContractRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
+        const driverContractRef = firestore.collection('users').doc(driverUid).collection('contracts').doc(contractId);
+        
+        batch.delete(adminContractRef);
+        batch.delete(driverContractRef);
+
+        await batch.commit();
+        
     } catch (error) {
-        console.error('Error deleting contract from Firestore:', error);
+        console.error('Error deleting contract with batch write:', error);
         throw new Error('Falha ao apagar o contrato.');
     }
 };
 
+
 // --- Signature Request Service (for remote signing link, logic remains similar) ---
+// FIX: Convertido para uma função para evitar erros de inicialização.
+// A referência é agora obtida de forma "preguiçosa", garantindo que `firestore` não seja nulo.
+const signatureRequestsRef = () => firestore.collection('signatureRequests');
+
 
 export const createSignatureRequest = async (
     adminUid: string, 
@@ -181,7 +162,7 @@ export const createSignatureRequest = async (
             createdAt: now,
             expiresAt: firebase.firestore.Timestamp.fromDate(expiresAt),
         };
-        const docRef = await signatureRequestsRef.add(newRequest);
+        const docRef = await signatureRequestsRef().add(newRequest);
         return docRef.id;
     } catch (error) {
         console.error('Error creating signature request:', error);
@@ -193,7 +174,7 @@ export const listenToSignatureRequest = (
     requestId: string, 
     callback: (request: SignatureRequest | null) => void
 ): (() => void) => {
-    return signatureRequestsRef.doc(requestId).onSnapshot(
+    return signatureRequestsRef().doc(requestId).onSnapshot(
         doc => {
             if (doc.exists) {
                 const data = doc.data() as Omit<SignatureRequest, 'id'>;
@@ -211,7 +192,7 @@ export const listenToSignatureRequest = (
 
 export const getSignatureRequest = async (requestId: string): Promise<SignatureRequest | null> => {
     try {
-        const doc = await signatureRequestsRef.doc(requestId).get();
+        const doc = await signatureRequestsRef().doc(requestId).get();
         if (!doc.exists) {
             console.log('No such signature request!');
             return null;
@@ -237,7 +218,7 @@ export const updateSignature = async (
     signatureDataUrl: string
 ): Promise<void> => {
     try {
-        const docRef = signatureRequestsRef.doc(requestId);
+        const docRef = signatureRequestsRef().doc(requestId);
         const doc = await docRef.get();
         if (!doc.exists) {
             throw new Error("Signature request not found.");
@@ -332,72 +313,83 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     });
 
     // --- Reworked Signature Placement Logic ---
+    const signatureWidth = 60;
+    const signatureHeight = 20;
+    const spaceBeforeSignatures = 10;
+    const signerNameFontSize = contractType === 'uber' ? 8 : 8.5;
+    const textLineHeightFactor = contractType === 'uber' ? 3.0 : 3.5;
+    const spaceAfterSignature = contractType === 'uber' ? 5 : 7;
+    const spaceBetweenImageAndText = 2;
 
-    const signatureWidth = 70;
-    const signatureHeight = 35;
-    // Estimate a generous, consistent height for each signature block (image + text)
-    const singleSignatureBlockHeight = 60; 
-    const totalSignaturesHeight = template.signatures.length * singleSignatureBlockHeight;
-    const spaceBeforeSignatures = 15;
+    // --- Dynamic Height Calculation ---
+    let calculatedTotalSignaturesHeight = 0;
+    doc.setFontSize(signerNameFontSize);
+    doc.setFont('times', 'normal');
 
-    // Check if the entire signature block fits on the current page. If not, add a new page.
-    if (y + spaceBeforeSignatures + totalSignaturesHeight > pageHeight - config.margin) {
+    const getSignatureBlockText = (signerName: string): string => {
+        if (signerName === 'NOME_PROPRIETARIO') {
+            return `Pelo Proprietário do Veículo:\n${allData.NOME_PROPRIETARIO}`;
+        }
+        if (signerName === 'REPRESENTANTE_NOME') {
+            if (contractType === 'comodato') {
+                return `Pelo Operador: ${allData.NOME_OPERADOR}\n(Representado por: ${allData.REPRESENTANTE_NOME})`;
+            }
+            if (contractType === 'uber') {
+                return `Pelo Operador TVDE:\n${allData.REPRESENTANTE_NOME}`;
+            }
+            return `Pela Primeira Contraente:\n${allData.REPRESENTANTE_NOME}`;
+        }
+        if (signerName === 'NOME_MOTORISTA') {
+            return `Pelo Motorista:\n${allData.NOME_MOTORISTA}`;
+        }
+        return '';
+    };
+
+    template.signatures.forEach((signerName) => {
+        const signatureBlockText = getSignatureBlockText(signerName);
+        const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (config.margin * 2));
+        const textHeight = textLines.length * textLineHeightFactor;
+        
+        const singleBlockHeight = signatureHeight + spaceBetweenImageAndText + textHeight + spaceAfterSignature;
+        calculatedTotalSignaturesHeight += singleBlockHeight;
+    });
+
+    // --- Page Break Decision ---
+    if (y + spaceBeforeSignatures + calculatedTotalSignaturesHeight > pageHeight - config.margin) {
         doc.addPage();
         y = config.yStart; // Reset y for the new page
     }
     
     y += spaceBeforeSignatures;
 
-    // Render signatures
-    const signerNameFontSize = contractType === 'uber' ? 8.5 : 9;
-    const textLineHeightFactor = contractType === 'uber' ? 3.0 : 3.5;
-    const spaceAfterSignature = contractType === 'uber' ? 7 : 10;
-
+    // --- Render Signatures ---
     template.signatures.forEach((signerName) => {
         const signatureDataUrl = signatures[signerName];
-        let signatureBlockText = '';
-        doc.setFontSize(signerNameFontSize);
-        doc.setFont('times', 'normal');
-
-        if(signerName === 'NOME_PROPRIETARIO') {
-            signatureBlockText = `Pelo Proprietário do Veículo:\n${allData.NOME_PROPRIETARIO}`;
-        } else if (signerName === 'REPRESENTANTE_NOME') {
-            if (contractType === 'comodato') {
-                signatureBlockText = `Pelo Operador: ${allData.NOME_OPERADOR}\n(Representado por: ${allData.REPRESENTANTE_NOME})`;
-            } else if (contractType === 'uber') {
-                signatureBlockText = `Pelo Operador TVDE:\n${allData.REPRESENTANTE_NOME}`;
-            } else { 
-                signatureBlockText = `Pela Primeira Contraente:\n${allData.REPRESENTANTE_NOME}`;
-            }
-        } else if (signerName === 'NOME_MOTORISTA') {
-            signatureBlockText = `Pelo Motorista:\n${allData.NOME_MOTORISTA}`;
-        }
+        const signatureBlockText = getSignatureBlockText(signerName);
+        const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (config.margin * 2));
         
         const centeredSignatureX = (pageWidth - signatureWidth) / 2;
+        const textY = y + signatureHeight + spaceBetweenImageAndText;
+        
+        doc.setFontSize(signerNameFontSize);
+        doc.setFont('times', 'normal');
+        
         if (signatureDataUrl) {
             try {
-                // The signature image is placed first
                 doc.addImage(signatureDataUrl, 'PNG', centeredSignatureX, y, signatureWidth, signatureHeight);
-                // The text is placed below the image
-                const textY = y + signatureHeight + 5; 
-                const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (config.margin * 2));
-                doc.text(textLines, pageWidth / 2, textY, { align: 'center' });
-                y = textY + (textLines.length * textLineHeightFactor) + spaceAfterSignature;
-
             } catch (e) {
-                console.warn('Error adding signature image:', e);
-                doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight);
-                doc.text('Signature Error', centeredSignatureX + 5, y + 15);
-                y += singleSignatureBlockHeight;
+                console.warn('Error adding signature image, drawing placeholder:', e);
+                doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight, 'S');
+                doc.text('Erro na Imagem', centeredSignatureX + 5, y + 15);
             }
         } else {
-             // If no signature, just draw the text block and advance y
-             const textLines = doc.splitTextToSize(signatureBlockText, pageWidth - (config.margin * 2));
-             const placeholderY = y + signatureHeight / 2; // Center text in placeholder area
-             doc.text(textLines, pageWidth / 2, placeholderY, { align: 'center' });
-             y += singleSignatureBlockHeight;
+             doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight, 'S');
         }
+
+        doc.text(textLines, pageWidth / 2, textY, { align: 'center' });
+        y = textY + (textLines.length * textLineHeightFactor) + spaceAfterSignature;
     });
+
 
     // --- Footer and Page Numbering Logic ---
     const totalPages = (doc.internal as any).pages.length;
@@ -419,7 +411,7 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
     const pdfBlob = doc.output('blob');
     const pdfDataUri = doc.output('datauristring');
     
-    const fileName = `${template.title.replace(/\s+/g, '_')}_${formData.DATA_ASSINatura || new Date().toISOString().split('T')[0]}.pdf`;
+    const fileName = `${template.title.replace(/\s+/g, '_')}_${formData.DATA_ASSINATURA || new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
 
     return { pdfBlob, pdfDataUri };
