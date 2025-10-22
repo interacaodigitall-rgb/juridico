@@ -45,9 +45,6 @@ const RemoteSign: React.FC = () => {
         previewContent = template.template;
         Object.entries(request.formData).forEach(([key, value]) => {
             const regex = new RegExp(`{{${key}}}`, 'g');
-            // FIX: The 'value' from Firestore can be of type 'unknown'. The expression `value || ...` would also be 'unknown',
-            // which is not assignable to the 'string' parameter of `replace`.
-            // Using a ternary operator with a truthiness check ensures the result is always a string, preserving the original logic.
             previewContent = previewContent.replace(regex, value ? String(value) : `[${key}]`);
         });
     }
@@ -56,17 +53,8 @@ const RemoteSign: React.FC = () => {
     // Canvas Logic
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
-
-    const clearCanvas = useCallback(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }, []);
-
-    useEffect(() => {
+    
+    const calibrateCanvas = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -77,13 +65,37 @@ const RemoteSign: React.FC = () => {
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
         ctx.scale(dpr, dpr);
+        
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#000000';
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }, [request]);
+    }, []);
+
+    const clearCanvas = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    }, []);
+
+    useEffect(() => {
+        if (request && !error) {
+             document.body.style.overflow = 'hidden';
+            const timer = setTimeout(calibrateCanvas, 50);
+            window.addEventListener('resize', calibrateCanvas);
+
+            return () => {
+                document.body.style.overflow = 'auto';
+                window.removeEventListener('resize', calibrateCanvas);
+                clearTimeout(timer);
+            };
+        }
+    }, [request, error, calibrateCanvas]);
 
     const getCoords = (e: MouseEvent | TouchEvent): { x: number, y: number } | null => {
         const canvas = canvasRef.current;
@@ -97,6 +109,7 @@ const RemoteSign: React.FC = () => {
     };
 
     const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         const coords = getCoords(e.nativeEvent);
         if (!coords) return;
         const ctx = canvasRef.current?.getContext('2d');
@@ -107,6 +120,7 @@ const RemoteSign: React.FC = () => {
     };
 
     const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         if (!isDrawing) return;
         const coords = getCoords(e.nativeEvent);
         if (!coords) return;
@@ -116,7 +130,8 @@ const RemoteSign: React.FC = () => {
         ctx.stroke();
     };
 
-    const stopDrawing = () => {
+    const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         setIsDrawing(false);
     };
 
@@ -160,31 +175,31 @@ const RemoteSign: React.FC = () => {
     }
 
     return (
-        <div className="bg-gray-900 min-h-screen text-gray-200 font-sans p-4 sm:p-6 md:p-8">
-            <div className="container mx-auto max-w-4xl">
-                 <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
-                        Assinatura de Documento
-                    </h1>
-                    <p className="text-gray-400 text-lg mt-2">
-                        Olá, <span className="font-bold">{request?.formData[signerToSign || '']}</span>. Por favor, reveja e assine o documento abaixo.
-                    </p>
-                </div>
+        <div className="bg-gray-900 min-h-screen text-gray-200 font-sans flex flex-col p-4">
+            <div className="text-center mb-4">
+                <h1 className="text-3xl font-bold text-gray-100">
+                    Assinatura de Documento
+                </h1>
+                <p className="text-gray-400">
+                    Olá, <span className="font-bold">{request?.formData[signerToSign || '']}</span>. Por favor, reveja e assine.
+                </p>
+            </div>
 
-                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 mb-8">
-                    <h2 className="text-2xl font-bold mb-4 text-gray-100">{request ? contractTemplates[request.contractType].title : ''}</h2>
-                    <div className="bg-white rounded-lg p-6 max-h-[50vh] overflow-y-auto shadow-inner">
-                        <div 
-                            className="text-black"
-                            style={{ fontFamily: "'Times New Roman', serif", lineHeight: 1.6, fontSize: '12px', textAlign: 'justify' }}
-                            dangerouslySetInnerHTML={{ __html: formattedContent }}
-                        />
-                    </div>
+            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 mb-4 overflow-hidden flex-shrink min-h-0">
+                <h2 className="text-xl font-bold mb-2 text-gray-100">{request ? contractTemplates[request.contractType].title : ''}</h2>
+                <div className="bg-white rounded-lg p-4 h-full overflow-y-auto shadow-inner">
+                    <div 
+                        className="text-black"
+                        style={{ fontFamily: "'Times New Roman', serif", lineHeight: 1.6, fontSize: '12px', textAlign: 'justify' }}
+                        dangerouslySetInnerHTML={{ __html: formattedContent }}
+                    />
                 </div>
+            </div>
 
-                <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-                     <h3 className="text-xl font-bold text-white mb-4">Sua Assinatura</h3>
-                     <canvas
+            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4 flex flex-col flex-grow">
+                 <h3 className="text-lg font-bold text-white mb-2 text-center">Sua Assinatura</h3>
+                 <div className="flex-grow w-full h-full min-h-[150px]">
+                    <canvas
                         ref={canvasRef}
                         onMouseDown={startDrawing}
                         onMouseMove={draw}
@@ -193,12 +208,12 @@ const RemoteSign: React.FC = () => {
                         onTouchStart={startDrawing}
                         onTouchMove={draw}
                         onTouchEnd={stopDrawing}
-                        className="w-full h-48 rounded-lg cursor-crosshair bg-white touch-action-none"
+                        className="w-full h-full rounded-lg cursor-crosshair bg-white touch-none"
                     />
-                    <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                        <button onClick={clearCanvas} className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300">Limpar</button>
-                        <button onClick={handleSubmitSignature} className="w-full sm:w-auto flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-300">Confirmar e Enviar Assinatura</button>
-                    </div>
+                 </div>
+                <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                    <button onClick={clearCanvas} className="w-full sm:w-auto px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300">Limpar</button>
+                    <button onClick={handleSubmitSignature} className="w-full sm:w-auto flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-all duration-300">Confirmar e Enviar</button>
                 </div>
             </div>
         </div>

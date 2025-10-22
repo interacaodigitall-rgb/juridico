@@ -94,14 +94,6 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
 
-    useEffect(() => {
-        const originalStyle = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            document.body.style.overflow = originalStyle;
-        };
-    }, []);
-
     const template = contractTemplates[contract.type];
     let previewContent = template.template;
     Object.entries(contract.data).forEach(([key, value]) => {
@@ -109,25 +101,18 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
     });
     const formattedContent = previewContent.replace(/\n/g, '<br />');
 
-    const clearCanvas = useCallback(() => {
+    const calibrateCanvas = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }, []);
-
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        
         const dpr = window.devicePixelRatio || 1;
         const rect = canvas.getBoundingClientRect();
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
         ctx.scale(dpr, dpr);
+        
         ctx.lineWidth = 2;
         ctx.strokeStyle = '#000000';
         ctx.lineCap = 'round';
@@ -135,6 +120,28 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }, []);
+
+    const clearCanvas = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    }, []);
+
+    useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        const timer = setTimeout(calibrateCanvas, 50);
+        window.addEventListener('resize', calibrateCanvas);
+
+        return () => {
+            document.body.style.overflow = 'auto';
+            window.removeEventListener('resize', calibrateCanvas);
+            clearTimeout(timer);
+        };
+    }, [calibrateCanvas]);
+
 
     const getCoords = (e: MouseEvent | TouchEvent): { x: number, y: number } | null => {
         const canvas = canvasRef.current;
@@ -145,6 +152,7 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
     };
 
     const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         const coords = getCoords(e.nativeEvent);
         if (!coords) return;
         const ctx = canvasRef.current?.getContext('2d');
@@ -154,6 +162,7 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
     };
 
     const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         if (!isDrawing) return;
         const coords = getCoords(e.nativeEvent);
         if (!coords) return;
@@ -162,7 +171,10 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
         ctx?.stroke();
     };
 
-    const stopDrawing = () => setIsDrawing(false);
+    const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
+        setIsDrawing(false);
+    };
 
     const handleSubmitSignature = async () => {
         if (!canvasRef.current) return;
@@ -192,7 +204,7 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
     
     if (isSigned) {
         return (
-             <div className="fixed inset-0 bg-gray-900 flex flex-col justify-center items-center text-center p-4">
+             <div className="fixed inset-0 bg-gray-900 flex flex-col justify-center items-center text-center p-4 z-50">
                 <div className="text-5xl mb-4">✅</div>
                 <h1 className="text-3xl font-bold text-green-400 mb-2">Assinatura Enviada!</h1>
                 <p className="text-lg text-gray-300">O contrato foi assinado com sucesso.</p>
@@ -202,22 +214,28 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; driverUi
     }
 
     return (
-        <div className="fixed inset-0 bg-gray-900 z-50 overflow-y-auto p-4 sm:p-6 md:p-8">
-            <div className="container mx-auto max-w-4xl">
-                <button onClick={onBack} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg mb-6">← Voltar à Lista</button>
-                <div className="glass-effect rounded-xl p-6">
-                     <h2 className="text-2xl font-bold mb-4 text-gray-100">{contract.title}</h2>
-                    <div className="bg-white rounded-lg p-6 max-h-[50vh] overflow-y-auto shadow-inner mb-6">
-                        <div dangerouslySetInnerHTML={{ __html: formattedContent }} style={{ fontFamily: "'Times New Roman', serif", color: 'black' }} />
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-4">Sua Assinatura</h3>
-                     <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} className="w-full h-48 rounded-lg cursor-crosshair bg-white touch-action-none" />
-                    <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                        <button onClick={clearCanvas} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg">Limpar</button>
-                        <button onClick={handleSubmitSignature} disabled={loading} className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50">
-                            {loading ? "Aguarde..." : "Confirmar e Assinar Contrato"}
-                        </button>
-                    </div>
+        <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col p-4">
+            <div className="flex-shrink-0 mb-4">
+                <button onClick={onBack} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">← Voltar à Lista</button>
+            </div>
+            
+            <div className="glass-effect rounded-xl p-4 mb-4 overflow-hidden flex-shrink min-h-0">
+                <h2 className="text-2xl font-bold mb-2 text-gray-100">{contract.title}</h2>
+                <div className="bg-white rounded-lg p-4 h-full overflow-y-auto shadow-inner">
+                    <div dangerouslySetInnerHTML={{ __html: formattedContent }} style={{ fontFamily: "'Times New Roman', serif", color: 'black', fontSize: '12px' }} />
+                </div>
+            </div>
+            
+            <div className="glass-effect rounded-xl p-4 flex flex-col flex-grow">
+                <h3 className="text-xl font-bold text-white mb-2 text-center">Sua Assinatura</h3>
+                 <div className="flex-grow w-full h-full min-h-[200px]">
+                    <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} className="w-full h-full rounded-lg cursor-crosshair bg-white touch-none" />
+                 </div>
+                <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                    <button onClick={clearCanvas} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-semibold">Limpar</button>
+                    <button onClick={handleSubmitSignature} disabled={loading} className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold disabled:opacity-50">
+                        {loading ? "Aguarde..." : "Confirmar e Assinar Contrato"}
+                    </button>
                 </div>
             </div>
         </div>

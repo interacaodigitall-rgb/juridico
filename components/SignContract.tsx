@@ -75,48 +75,51 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
         setIsLocalSignModalOpen(false);
         setCurrentSigner(null);
     };
-
-    useEffect(() => {
-        const originalStyle = document.body.style.overflow;
-        if (isLocalSignModalOpen || isLinkModalOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = originalStyle;
-        }
-        return () => { document.body.style.overflow = originalStyle; };
-    }, [isLocalSignModalOpen, isLinkModalOpen]);
-
+    
+    const calibrateCanvas = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000000';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }, []);
+    
     const clearCanvas = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
+        // The canvas is already scaled, so we clear based on its CSS dimensions
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     }, []);
 
     useEffect(() => {
-        if (!isLocalSignModalOpen || !canvasRef.current) return;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        
-        const timer = setTimeout(() => {
-            const dpr = window.devicePixelRatio || 1;
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#000000';
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }, 50);
+        if (isLocalSignModalOpen) {
+            document.body.style.overflow = 'hidden';
+            // Delay calibration slightly to ensure modal CSS is applied
+            const timer = setTimeout(calibrateCanvas, 50);
+            window.addEventListener('resize', calibrateCanvas);
 
-        return () => clearTimeout(timer);
-    }, [isLocalSignModalOpen]);
+            return () => {
+                document.body.style.overflow = 'auto';
+                window.removeEventListener('resize', calibrateCanvas);
+                clearTimeout(timer);
+            };
+        }
+    }, [isLocalSignModalOpen, calibrateCanvas]);
 
     const getCoords = (e: MouseEvent | TouchEvent): { x: number, y: number } | null => {
         const canvas = canvasRef.current;
@@ -127,6 +130,7 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
     };
 
     const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         const coords = getCoords(e.nativeEvent);
         if (!coords) return;
         const ctx = canvasRef.current?.getContext('2d');
@@ -137,6 +141,7 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
     };
 
     const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
         if (!isDrawing) return;
         const coords = getCoords(e.nativeEvent);
         if (!coords) return;
@@ -146,20 +151,23 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
         ctx.stroke();
     };
 
-    const stopDrawing = () => { setIsDrawing(false); };
+    const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
+        setIsDrawing(false);
+     };
 
     // --- Modals ---
     const LocalSignatureModal = (
-        <div className="fixed inset-0 bg-gray-800 z-50 p-4 sm:p-6 flex flex-col">
-            <div className="mb-4">
+        <div className="fixed inset-0 bg-gray-900 z-50 p-4 flex flex-col">
+            <div className="mb-4 text-center">
                 <h3 className="text-xl font-bold text-white">Área de Assinatura</h3>
                 <p className="text-gray-400">Assinando como: <span className="font-semibold text-blue-400">{formData[currentSigner || ''] || currentSigner}</span></p>
             </div>
-            <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} className="w-full h-full rounded-lg cursor-crosshair bg-white flex-grow touch-action-none" />
-            <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                <button onClick={() => setIsLocalSignModalOpen(false)} className="w-full sm:w-auto px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold">Cancelar</button>
-                <button onClick={clearCanvas} className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Limpar</button>
-                <button onClick={handleSaveLocalSignature} className="w-full sm:w-auto flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold">Confirmar Assinatura</button>
+            <canvas ref={canvasRef} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} className="w-full h-full rounded-lg cursor-crosshair bg-white flex-grow touch-none" />
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                <button onClick={() => setIsLocalSignModalOpen(false)} className="w-full sm:w-auto px-4 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold">Cancelar</button>
+                <button onClick={clearCanvas} className="w-full sm:w-auto px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Limpar</button>
+                <button onClick={handleSaveLocalSignature} className="w-full sm:w-auto flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold">Confirmar Assinatura</button>
             </div>
         </div>
     );
