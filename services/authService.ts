@@ -7,57 +7,56 @@ declare const firebase: any;
 const ADMIN_EMAIL = 'adm@asfaltocativante.pt';
 
 /**
- * Obtém o perfil de um utilizador da coleção 'users'.
- * Inclui uma lógica de fallback robusta para o utilizador administrador.
- * @param uid O ID do utilizador.
- * @returns O perfil do utilizador ou null se não for encontrado.
+ * Obtém o perfil de um utilizador. Se não existir, cria-o 'on-the-fly'.
+ * Esta abordagem "auto-corretiva" garante que cada utilizador autenticado
+ * tenha um perfil correspondente no Firestore com o ID de documento correto (o seu Auth UID).
+ * @param uid O ID do utilizador do Firebase Auth.
+ * @returns O perfil do utilizador.
  */
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
-        const userDoc = await firestore.collection('users').doc(uid).get();
+        const userDocRef = firestore.collection('users').doc(uid);
+        const userDoc = await userDocRef.get();
+
         if (userDoc.exists) {
             return userDoc.data() as UserProfile;
         }
 
-        // Se o perfil não existe, verifique se é o admin a fazer login pela primeira vez.
-        // Se for, cria o perfil dele na base de dados para garantir consistência.
-        if (auth.currentUser && auth.currentUser.email === ADMIN_EMAIL) {
-            console.log("Perfil de administrador não encontrado na coleção 'users'. A criar perfil on-the-fly.");
-            const adminProfile: UserProfile = {
-                uid,
-                email: auth.currentUser.email!,
-                role: 'admin',
+        // --- Perfil não encontrado, vamos criar ---
+        const currentUser = auth.currentUser;
+        if (currentUser && currentUser.uid === uid && currentUser.email) {
+            console.log(`Perfil para o utilizador ${currentUser.email} (UID: ${uid}) não encontrado. A criar agora...`);
+
+            const role: UserRole = currentUser.email === ADMIN_EMAIL ? 'admin' : 'driver';
+
+            const newProfile: UserProfile = {
+                uid: uid,
+                email: currentUser.email,
+                role: role,
             };
-            // Esta escrita pode falhar se as regras de segurança forem muito restritivas,
-            // mas o perfil é retornado de qualquer forma para permitir o login.
-            await firestore.collection('users').doc(uid).set(adminProfile);
-            return adminProfile;
+            
+            // Cria o documento do perfil com o ID de documento a corresponder ao Auth UID
+            await userDocRef.set(newProfile);
+            console.log(`Perfil para ${currentUser.email} criado com sucesso.`);
+            
+            return newProfile;
         }
         
-        console.warn(`Utilizador com UID ${uid} não tem perfil na base de dados.`);
+        console.warn(`Não foi possível obter/criar o perfil para o UID ${uid} porque o utilizador não está logado ou não corresponde.`);
         return null;
 
     } catch (error: any) {
         console.error("Erro ao obter o perfil do utilizador:", error.message);
         
-        // FALLBACK: Se o erro for de permissão, mas o utilizador estiver autenticado,
-        // inferimos o seu papel para desbloquear o login.
-        // Isto permite que o utilizador aceda à aplicação mesmo com regras de segurança mal configuradas.
+        // MANTÉM O FALLBACK: Em caso de erro de permissão, inferir o papel é melhor que bloquear o utilizador.
         if (auth.currentUser && (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED' || error.message.includes('insufficient permissions'))) {
-            if (auth.currentUser.email === ADMIN_EMAIL) {
+            const email = auth.currentUser.email!;
+            if (email === ADMIN_EMAIL) {
                 console.warn("O acesso ao Firestore falhou. A assumir o papel de administrador com base no e-mail.");
-                return {
-                    uid: auth.currentUser.uid,
-                    email: auth.currentUser.email!,
-                    role: 'admin',
-                };
+                return { uid: auth.currentUser.uid, email, role: 'admin' };
             } else {
-                 console.warn(`O acesso ao Firestore falhou para ${auth.currentUser.email}. A assumir o papel de motorista como fallback.`);
-                 return {
-                    uid: auth.currentUser.uid,
-                    email: auth.currentUser.email!,
-                    role: 'driver',
-                 };
+                 console.warn(`O acesso ao Firestore falhou para ${email}. A assumir o papel de motorista como fallback.`);
+                 return { uid: auth.currentUser.uid, email, role: 'driver' };
             }
         }
 

@@ -24,19 +24,29 @@ const signatureRequestsRef = firestore.collection('signatureRequests');
 export const loadContracts = async (uid: string, role: 'admin' | 'driver'): Promise<SavedContract[]> => {
     try {
         const contractsRef = firestore.collection('users').doc(uid).collection('contracts');
-        let query = contractsRef.orderBy('createdAt', 'desc');
-
-        // Drivers only see contracts pending their signature
-        if (role === 'driver') {
-            query = query.where('status', '==', 'pending_signature');
-        }
+        // A consulta para obter contratos, sempre ordenados por data de criação.
+        const query = contractsRef.orderBy('createdAt', 'desc');
 
         const snapshot = await query.get();
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+        const allContracts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
 
-    } catch (error) {
+        // Se o utilizador for um motorista, filtramos os contratos no lado do cliente.
+        // Isto evita a necessidade de um índice composto no Firestore, que estava a causar o erro.
+        if (role === 'driver') {
+            return allContracts.filter(contract => contract.status === 'pending_signature');
+        }
+        
+        // O administrador vê todos os contratos.
+        return allContracts;
+
+    } catch (error: any) {
         console.error(`Error loading ${role} contracts from subcollection:`, error);
-        alert('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet e as permissões da base de dados.');
+        // Mensagem de erro melhorada para detetar problemas de índice futuros.
+        if (error.code === 'failed-precondition' && error.message && error.message.includes('index')) {
+             alert('Ocorreu um erro de configuração da base de dados (índice em falta). Por favor, contacte o suporte técnico se o problema persistir.');
+        } else {
+             alert('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet e as permissões da base de dados.');
+        }
         return [];
     }
 };

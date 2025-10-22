@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Step, ContractType, FormData, Signatures, SavedContract, UserProfile } from '../types';
+import { Step, ContractType, FormData, Signatures, SavedContract } from '../types';
 import { contractTemplates, empresaData } from '../constants';
 import StepIndicator from './StepIndicator';
 import SelectContract from './SelectContract';
@@ -15,16 +15,8 @@ import {
     deleteContract
 } from '../services/contractService';
 import { findUserByEmail } from '../services/authService';
-import { auth, firestore } from '../firebase';
 
-
-// Declara o objeto global do Firebase para que o TypeScript o reconheça
-declare const firebase: any;
-
-interface AdminDashboardProps {
-    user: any;
-    onLogout: () => void;
-}
+const FIREBASE_PROJECT_ID = 'sistema-juridico-tvde';
 
 const Header = ({ user, onLogout, syncStatus }: { user: any, onLogout: () => void, syncStatus: SyncStatus }) => (
     <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
@@ -44,13 +36,49 @@ const Header = ({ user, onLogout, syncStatus }: { user: any, onLogout: () => voi
     </div>
 );
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
+const InstructionModal = ({ email, onClose, onRetry }: { email: string, onClose: () => void, onRetry: () => void }) => {
+    const firebaseProjectUrl = `https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/users`;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 fade-in">
+            <div className="bg-gray-800 rounded-xl w-full max-w-2xl p-6 text-left border border-gray-600 shadow-2xl">
+                <h3 className="text-2xl font-bold text-white mb-4">Ação Necessária: Criar Conta do Motorista</h3>
+                <p className="text-gray-300 mb-4">
+                    A conta para o motorista <strong className="text-blue-400">{email}</strong> não foi encontrada.
+                    Para que o contrato possa ser enviado para o portal, a conta de autenticação do motorista precisa de ser criada primeiro.
+                </p>
+                <div className="space-y-3 text-gray-200 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                    <p><strong>Passo 1:</strong> Abra a consola do Firebase num novo separador clicando no link abaixo.</p>
+                    <a href={firebaseProjectUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline break-all">
+                        Ir para a página de Autenticação do Firebase →
+                    </a>
+                    <p><strong>Passo 2:</strong> Clique no botão <strong>"Adicionar utilizador"</strong>.</p>
+                    <p><strong>Passo 3:</strong> Preencha o e-mail: <code className="bg-gray-700 p-1 rounded text-yellow-300">{email}</code></p>
+                    <p><strong>Passo 4:</strong> Defina uma palavra-passe temporária (ex: <strong>0123456</strong>) e forneça-a ao motorista.</p>
+                    <p><strong>Passo 5:</strong> Clique em <strong>"Adicionar utilizador"</strong>.</p>
+                    <p className="pt-2 text-sm text-gray-400">Depois disto, o perfil do motorista na base de dados será criado automaticamente quando ele fizer o primeiro login.</p>
+                </div>
+                <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-end">
+                    <button onClick={onClose} className="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold transition-all duration-300">Cancelar</button>
+                    <button onClick={onRetry} className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-300">Já Criei a Conta, Tentar Novamente</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogout }) => {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
     const [step, setStep] = useState<Step>(Step.Select);
     const [completedSteps, setCompletedSteps] = useState<Set<Step>>(new Set([Step.Select]));
     const [contractType, setContractType] = useState<ContractType | null>(null);
     const [formData, setFormData] = useState<FormData>({});
     const [contracts, setContracts] = useState<SavedContract[]>([]);
+
+    const [isInstructionModalOpen, setIsInstructionModalOpen] = useState(false);
+    const [driverEmailForModal, setDriverEmailForModal] = useState('');
+    const [retryPayload, setRetryPayload] = useState<{ signatures: Signatures; action: 'send' | 'finalize' } | null>(null);
 
     useEffect(() => {
         if (!user) {
@@ -101,22 +129,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
         if (!contractType || !user) return;
         setSyncStatus('syncing');
 
-        const driverPasswordSuggestion = '0123456';
-
         try {
-            // 1. Encontrar o perfil do motorista para obter o UID
-            let driverProfile = await findUserByEmail(driverEmail);
+            const driverProfile = await findUserByEmail(driverEmail);
             
             if (!driverProfile) {
-                const shouldCreate = window.confirm(`Não foi encontrada uma conta para o motorista com o e-mail ${driverEmail}.\n\nPara prosseguir, uma conta precisa de ser criada para ele na consola do Firebase.\n\nUse a palavra-passe temporária: ${driverPasswordSuggestion}\n\nO motorista poderá usá-la para aceder e assinar. Clique em 'OK' se já criou a conta e quer tentar novamente.`);
-                if (shouldCreate) {
-                    driverProfile = await findUserByEmail(driverEmail);
-                    if (!driverProfile) {
-                        throw new Error("A conta do motorista ainda não foi encontrada. Por favor, crie-a na consola do Firebase e tente novamente.");
-                    }
-                } else {
-                    throw new Error("Criação de contrato cancelada. Crie a conta do motorista primeiro.");
-                }
+                setDriverEmailForModal(driverEmail);
+                setRetryPayload({ signatures, action });
+                setIsInstructionModalOpen(true);
+                setSyncStatus('synced');
+                return;
             }
             
             const currentTemplate = contractTemplates[contractType];
@@ -127,11 +148,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 contractStatus = 'completed';
             }
 
-            // 2. Preparar e guardar o contrato usando o novo serviço
             const newContract: Omit<SavedContract, 'id'> = {
                 type: contractType,
                 title: currentTemplate.title,
-                data: { ...formData, DRIVER_EMAIL: driverEmail }, // Store email for reference
+                data: { ...formData, DRIVER_EMAIL: driverEmail },
                 signatures,
                 createdAt: new Date().toISOString(),
                 adminUid: user.uid,
@@ -142,7 +162,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             
             await saveContract(newContract);
             
-            // 3. Gerar PDF se finalizado localmente ou notificar o envio
             if (action === 'finalize') {
                 if (allSignaturesCollected) {
                     await generateFinalPDF(currentTemplate, newContract.data, signatures, contractType);
@@ -150,11 +169,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                 } else {
                     alert('⚠️ Aviso! O PDF não foi gerado porque faltam assinaturas. O contrato foi guardado como pendente.');
                 }
-            } else { // action === 'send'
-                alert('✅ Sucesso! Contrato enviado para o portal do motorista para assinatura.');
+            } else {
+                alert('✅ Sucesso! O contrato foi enviado para o portal do motorista e aguarda assinatura.');
             }
 
-            // 4. Atualizar a lista local e voltar ao início
             const updatedContracts = await loadContracts(user.uid, 'admin');
             setContracts(updatedContracts);
             setSyncStatus('synced');
@@ -164,6 +182,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
             setSyncStatus('error');
             console.error(error);
             alert(`❌ Erro: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    };
+
+    const handleRetryFinalize = () => {
+        if (driverEmailForModal && retryPayload) {
+            setIsInstructionModalOpen(false);
+            handleFinalizeContract(retryPayload.signatures, driverEmailForModal, retryPayload.action);
         }
     };
     
@@ -209,6 +234,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
     return (
         <div className="p-4 sm:p-6">
+             {isInstructionModalOpen && (
+                <InstructionModal 
+                    email={driverEmailForModal}
+                    onClose={() => setIsInstructionModalOpen(false)}
+                    onRetry={handleRetryFinalize}
+                />
+            )}
             <div className="container mx-auto px-4 py-6 max-w-7xl">
                 <Header user={user} onLogout={onLogout} syncStatus={syncStatus} />
                 <div className="glass-effect rounded-xl p-4 sm:p-6 mb-8">
