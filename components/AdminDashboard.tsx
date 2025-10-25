@@ -11,8 +11,7 @@ import GitSyncIndicator, { SyncStatus } from './GitSyncIndicator';
 import { 
     generateFinalPDF, 
     loadContracts,
-    saveContract,
-    deleteContract
+    saveContract
 } from '../services/contractService';
 import { findUserByEmail } from '../services/authService';
 
@@ -67,11 +66,34 @@ const InstructionModal = ({ email, onClose, onRetry }: { email: string, onClose:
     );
 };
 
+const DashboardHome = ({ onNew, onManage }: { onNew: () => void, onManage: () => void }) => (
+    <div className="glass-effect rounded-xl p-8 text-center fade-in">
+        <h2 className="text-3xl font-bold text-gray-100 mb-4">Bem-vindo ao Painel de Gestão</h2>
+        <p className="text-gray-400 mb-8 max-w-xl mx-auto">Crie um novo contrato para um motorista ou consulte o arquivo de todos os documentos pendentes e concluídos.</p>
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
+            <button
+                onClick={onNew}
+                className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-3 text-lg"
+            >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                <span>Criar Novo Contrato</span>
+            </button>
+            <button
+                onClick={onManage}
+                className="w-full sm:w-auto px-8 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-all duration-300 flex items-center justify-center space-x-3 text-lg"
+            >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                <span>Aceder ao Arquivo</span>
+            </button>
+        </div>
+    </div>
+);
+
 
 const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogout }) => {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
-    const [step, setStep] = useState<Step>(Step.Manage);
-    const [completedSteps, setCompletedSteps] = useState<Set<Step>>(new Set([Step.Select, Step.Manage]));
+    const [step, setStep] = useState<Step>(Step.Dashboard);
+    const [completedSteps, setCompletedSteps] = useState<Set<Step>>(new Set([Step.Dashboard, Step.Select, Step.Manage]));
     const [contractType, setContractType] = useState<ContractType | null>(null);
     const [formData, setFormData] = useState<FormData>({});
     const [contracts, setContracts] = useState<SavedContract[]>([]);
@@ -102,9 +124,9 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
         fetchContracts();
     }, [fetchContracts]);
 
-    const resetProcess = useCallback(() => {
+    const startNewContractProcess = useCallback(() => {
         setStep(Step.Select);
-        setCompletedSteps(new Set([Step.Select, Step.Manage]));
+        setCompletedSteps(new Set([Step.Dashboard, Step.Select, Step.Manage]));
         setContractType(null);
         setFormData({});
     }, []);
@@ -133,8 +155,16 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
         setCompletedSteps(prev => new Set([...prev, Step.Sign]));
     };
 
-    const handleFinalizeContract = async (signatures: Signatures, driverEmail: string, action: 'send' | 'finalize') => {
+    const handleFinalizeContract = async (signatures: Signatures, action: 'send' | 'finalize') => {
         if (!contractType || !user) return;
+
+        const driverEmail = formData.EMAIL_MOTORISTA;
+        if (!driverEmail) {
+            alert('❌ Erro: O e-mail do motorista é obrigatório e não foi encontrado no formulário.');
+            setSyncStatus('error');
+            return;
+        }
+        
         setSyncStatus('syncing');
 
         try {
@@ -159,7 +189,7 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
             const newContract: Omit<SavedContract, 'id'> = {
                 type: contractType,
                 title: currentTemplate.title,
-                data: { ...formData, DRIVER_EMAIL: driverEmail },
+                data: formData,
                 signatures,
                 createdAt: new Date().toISOString(),
                 adminUid: user.uid,
@@ -184,8 +214,10 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
 
             fetchContracts();
             setSyncStatus('synced');
-            resetProcess();
-            setStep(Step.Manage);
+            setStep(Step.Dashboard);
+            setCompletedSteps(new Set([Step.Dashboard, Step.Select, Step.Manage]));
+            setContractType(null);
+            setFormData({});
 
         } catch (error) {
             setSyncStatus('error');
@@ -195,39 +227,28 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
     };
 
     const handleRetryFinalize = () => {
-        if (driverEmailForModal && retryPayload) {
+        if (retryPayload) {
             setIsInstructionModalOpen(false);
-            handleFinalizeContract(retryPayload.signatures, driverEmailForModal, retryPayload.action);
+            handleFinalizeContract(retryPayload.signatures, retryPayload.action);
         }
     };
     
-    const handleDeleteContract = async (contract: SavedContract) => {
-        if (!user) return;
-        setSyncStatus('syncing');
-        try {
-            await deleteContract(contract.id, contract.adminUid, contract.driverUid);
-            setContracts(prev => prev.filter(c => c.id !== contract.id));
-            setSyncStatus('synced');
-        } catch(error) {
-            setSyncStatus('error');
-            alert(`❌ Erro ao apagar o contrato: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    };
-
     const handleEditContract = (contract: SavedContract) => {
         setContractType(contract.type);
         setFormData(contract.data);
         setStep(Step.Form);
-        setCompletedSteps(new Set([Step.Select, Step.Form, Step.Preview, Step.Sign, Step.Manage]));
+        setCompletedSteps(new Set([Step.Dashboard, Step.Select, Step.Form, Step.Preview, Step.Sign, Step.Manage]));
     };
 
     const renderStep = () => {
         switch (step) {
+            case Step.Dashboard:
+                return <DashboardHome onNew={startNewContractProcess} onManage={() => setStep(Step.Manage)} />;
             case Step.Select:
-                return <SelectContract onSelect={handleSelectContract} />;
+                return <SelectContract onSelect={handleSelectContract} onBackToDashboard={() => setStep(Step.Dashboard)} />;
             case Step.Form:
                 if (!contractType) return null;
-                return <ContractForm template={contractTemplates[contractType]} onBack={resetProcess} onNext={handleFormSubmit} initialData={formData}/>;
+                return <ContractForm template={contractTemplates[contractType]} onBack={startNewContractProcess} onNext={handleFormSubmit} initialData={formData}/>;
             case Step.Preview:
                 if (!contractType) return null;
                 return <PreviewContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Form)} onNext={handlePreviewAccept} contractType={contractType} />;
@@ -235,12 +256,13 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
                 if (!contractType) return null;
                 return <SignContract template={contractTemplates[contractType]} formData={formData} onBack={() => setStep(Step.Preview)} onFinalize={handleFinalizeContract} contractType={contractType} />;
             case Step.Manage:
-                return <ManageContracts contracts={contracts} onDelete={handleDeleteContract} onEdit={handleEditContract} onNew={resetProcess}/>;
+                return <ManageContracts contracts={contracts} onEdit={handleEditContract} onNew={startNewContractProcess} onBackToDashboard={() => setStep(Step.Dashboard)} />;
             default:
-                 // Por defeito, vai para a gestão se já tivermos carregado dados, senão para a seleção.
-                 return contracts.length > 0 ? <ManageContracts contracts={contracts} onDelete={handleDeleteContract} onEdit={handleEditContract} onNew={resetProcess}/> : <SelectContract onSelect={handleSelectContract} />;
+                 return <DashboardHome onNew={startNewContractProcess} onManage={() => setStep(Step.Manage)} />;
         }
     };
+    
+    const isCreationFlow = [Step.Select, Step.Form, Step.Preview, Step.Sign].includes(step);
 
     return (
         <div className="p-4 sm:p-6">
@@ -253,21 +275,13 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
             )}
             <div className="container mx-auto px-4 py-6 max-w-7xl">
                 <Header user={user} onLogout={onLogout} syncStatus={syncStatus} />
-                <div className="glass-effect rounded-xl p-4 sm:p-6 mb-8">
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                
+                {isCreationFlow && (
+                    <div className="glass-effect rounded-xl p-4 sm:p-6 mb-8">
                         <StepIndicator currentStep={step} goToStep={goToStep} completedSteps={completedSteps} />
-                        <button
-                            onClick={() => {
-                                setStep(Step.Manage)
-                                setCompletedSteps(prev => new Set([...prev, Step.Manage]));
-                            }}
-                            className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg font-semibold hover:from-green-700 hover:to-green-800 transition-all duration-300 flex items-center space-x-2 shadow-lg"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
-                            <span>Arquivo</span>
-                        </button>
                     </div>
-                </div>
+                )}
+
                 <main>{renderStep()}</main>
             </div>
         </div>

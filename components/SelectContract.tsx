@@ -4,6 +4,7 @@ import { ContractType } from '../types';
 
 interface SelectContractProps {
     onSelect: (type: ContractType) => void;
+    onBackToDashboard: () => void;
 }
 
 const contractOptions = [
@@ -20,7 +21,7 @@ const tagColors: Record<string, string> = {
     yellow: 'bg-yellow-600/20 text-yellow-400',
 }
 
-const SelectContract: React.FC<SelectContractProps> = ({ onSelect }) => {
+const SelectContract: React.FC<SelectContractProps> = ({ onSelect, onBackToDashboard }) => {
     return (
         <div className="glass-effect rounded-xl p-8 fade-in">
             <h2 className="text-3xl font-bold text-center mb-8 text-gray-100">Selecione o Tipo de Contrato</h2>
@@ -41,6 +42,15 @@ const SelectContract: React.FC<SelectContractProps> = ({ onSelect }) => {
                         </div>
                     </div>
                 ))}
+            </div>
+            <div className="mt-8 pt-6 border-t border-gray-700 text-center">
+                <button
+                    onClick={onBackToDashboard}
+                    className="px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-all duration-300 flex items-center space-x-2 mx-auto"
+                >
+                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                    <span>Voltar ao Painel</span>
+                </button>
             </div>
         </div>
     );

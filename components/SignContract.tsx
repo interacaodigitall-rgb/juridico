@@ -8,7 +8,7 @@ interface SignContractProps {
     formData: FormData;
     contractType: ContractType;
     onBack: () => void;
-    onFinalize: (signatures: Signatures, driverEmail: string, action: 'send' | 'finalize') => void;
+    onFinalize: (signatures: Signatures, action: 'send' | 'finalize') => void;
 }
 
 const SignContract: React.FC<SignContractProps> = ({ template, formData, contractType, onBack, onFinalize }) => {
@@ -239,11 +239,11 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
                 <div className="mt-10 flex flex-col sm:flex-row justify-between gap-4">
                     <button onClick={onBack} className="w-full sm:w-auto px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold">Voltar</button>
                     <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-4">
-                        <button onClick={() => onFinalize(signatures, 'assinatura@asfaltocativante.pt', 'send')} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300">
+                        <button onClick={() => onFinalize(signatures, 'send')} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300">
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                             <span>Enviar para Portal</span>
                         </button>
-                         <button onClick={() => onFinalize(signatures, 'assinatura@asfaltocativante.pt', 'finalize')} disabled={!allLocalSignaturesCollected} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-600 disabled:to-gray-700">
+                         <button onClick={() => onFinalize(signatures, 'finalize')} disabled={!allLocalSignaturesCollected} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-600 disabled:to-gray-700">
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             <span>Gerar PDF Final</span>
                         </button>

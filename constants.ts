@@ -29,10 +29,21 @@ export const contractTemplates: Record<ContractType, ContractTemplate> = {
             { name: "CC", label: "Cartão de Cidadão / Autorização de Residência / Passaporte", type: "text", required: true, category: "motorista" },
             { name: "VALIDADE_CC", label: "Validade do Documento", type: "date", required: true, category: "motorista" },
             { name: "CERTIFICADO_TVDE", label: "Certificado TVDE", type: "text", required: true, category: "motorista" },
+            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: true, category: "motorista" },
+            { name: "MARCA", label: "Marca do Veículo", type: "text", required: true, category: "veiculo" },
+            { name: "MODELO", label: "Modelo do Veículo", type: "text", required: true, category: "veiculo" },
+            { name: "MATRICULA", label: "Matrícula", type: "text", required: true, category: "veiculo" },
+            { name: "DUA", label: "Número DUA", type: "text", required: true, category: "veiculo" },
+            { name: "APOLICE", label: "Apólice de Seguro", type: "text", required: true, category: "veiculo" },
+            { name: "VALIDADE_SEGURO", label: "Validade do Seguro", type: "date", required: true, category: "veiculo" },
+            { name: "KM_INICIAL", label: "Quilometragem Inicial", type: "number", required: true, category: "veiculo" },
+            { name: "ESTADO_EXTERIOR", label: "Estado Exterior", type: "text", required: true, category: "veiculo", default: "Bom, sem danos visíveis." },
+            { name: "ESTADO_INTERIOR", label: "Estado Interior", type: "text", required: true, category: "veiculo", default: "Bom, limpo e higienizado." },
+            { name: "ESTADO_PNEUS", label: "Estado dos Pneus", type: "text", required: true, category: "veiculo", default: "Bom estado." },
+            { name: "NIVEL_COMBUSTIVEL", label: "Nível Combustível", type: "text", required: true, category: "veiculo", default: "1/4" },
+            { name: "MODALIDADE_PERCENTAGEM", label: "Ativar modalidade percentual (4% serviço + 6% IVA)", type: "checkbox", required: false, category: "financeiro" },
             { name: "VALOR_TAXA", label: "Taxa Semanal (€)", type: "number", required: true, category: "financeiro" },
-            { name: "CAUCAO", label: "Valor da Caução (€)", type: "number", required: true, category: "financeiro" },
             { name: "DURACAO_CONTRATO", label: "Duração do Contrato", type: "text", required: true, category: "financeiro", default: "1 ano" },
-            { name: "MULTA_CESSACAO", label: "Multa por Cessação (€)", type: "number", required: true, category: "financeiro", default: 250 },
             { name: "DATA_ASSINATURA", label: "Data de Assinatura", type: "date", required: true, default: new Date().toISOString().split('T')[0], category: "financeiro" }
         ],
         template: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS TVDE
@@ -64,8 +75,22 @@ Durante a vigência deste contrato, o Motorista obriga-se a utilizar exclusivame
 CLÁUSULA QUARTA (Serviços e meios)
 O Motorista obriga-se a prestar os serviços de transporte TVDE através das plataformas digitais activas (Uber, Bolt, FreeNow ou outras). A Primeira Contraente compromete-se a fornecer viatura devidamente licenciada, seguro válido e equipamentos necessários, bem como viatura de substituição em caso de avaria não imputável ao Motorista. Mantém em vigor os seguros obrigatórios (Responsabilidade Civil + Acidentes Pessoais TVDE).
 
-CLÁUSULA QUINTA (Remuneração)
-A remuneração do Motorista terá como referência a facturação líquida efectivamente obtida com os serviços prestados, deduzidas as taxas das plataformas, impostos aplicáveis e a taxa de utilização da viatura e gestão de frota fixada em {{VALOR_TAXA}} €/semana. Combustível, portagens e limpeza são encargos do Motorista.
+CLÁUSULA QUARTA-A (Identificação da Viatura)
+A viatura disponibilizada para a prestação de serviços é identificada com os seguintes dados:
+Marca: {{MARCA}}
+Modelo/Versão: {{MODELO}}
+Matrícula: {{MATRICULA}}
+N.º DUA: {{DUA}}
+N.º Apólice de Seguro: {{APOLICE}} / Validade: {{VALIDADE_SEGURO}}
+Quilometragem Inicial: {{KM_INICIAL}}
+
+Estado da viatura na entrega:
+- Exterior: {{ESTADO_EXTERIOR}}
+- Interior: {{ESTADO_INTERIOR}}
+- Pneus: {{ESTADO_PNEUS}}
+- Combustível/Carregamento: {{NIVEL_COMBUSTIVEL}}
+
+{{CLAUSULA_QUINTA_REMUNERACAO}}
 
 CLÁUSULA SEXTA (Forma de Pagamento)
 Os pagamentos são efectuados semanalmente, por transferência bancária, após dedução das quantias previstas. O Motorista obriga-se a emitir recibo electrónico no prazo máximo de 5 dias úteis.
@@ -82,20 +107,17 @@ O Motorista obriga-se a cumprir a Lei n.º 45/2018, respeitar o limite máximo d
 CLÁUSULA DÉCIMA (Responsabilidade)
 O Motorista responde civil, criminal e contraordenacionalmente pelos actos praticados no exercício da actividade. Em caso de acidente imputável, suporta os encargos não cobertos pelo seguro, incluindo franquias. A Primeira Contraente não responde por actos ou omissões dos clientes transportados.
 
-CLÁUSULA DÉCIMA PRIMEIRA (Caução)
-A Primeira Contraente pode reter, a título de caução, o valor de {{CAUCAO}} €, para cobertura de danos, multas ou incumprimentos. Findo o contrato, e não havendo responsabilidades pendentes, a caução será devolvida no prazo de 10 dias úteis.
-
-CLÁUSULA DÉCIMA SEGUNDA (Confidencialidade)
+CLÁUSULA DÉCIMA PRIMEIRA (Confidencialidade)
 As partes obrigam-se a guardar sigilo relativamente a todas as informações comerciais, operacionais ou pessoais obtidas no âmbito deste contrato.
 
-CLÁUSULA DÉCIMA TERCEIRA (Protecção de Dados)
+CLÁUSULA DÉCIMA SEGUNDA (Protecção de Dados)
 O tratamento de dados pessoais será realizado em conformidade com o RGPD, destinando-se exclusivamente à execução do contrato.
 
-CLÁUSULA DÉCIMA QUARTA (Duração e Renovação)
+CLÁUSULA DÉCIMA TERCEIRA (Duração e Renovação)
 O contrato tem a duração inicial de {{DURACAO_CONTRATO}} a contar da data da assinatura, renovando-se automaticamente por iguais períodos, salvo denúncia.
 
-CLÁUSULA DÉCIMA QUINTA (Cessação e Denúncia)
-Qualquer incumprimento contratual grave permite a resolução imediata do contrato. Qualquer das partes pode denunciar o contrato mediante aviso escrito com 15 dias de antecedência. O não cumprimento do aviso prévio implica o pagamento de {{MULTA_CESSACAO}} € ou desconto proporcional na caução.
+CLÁUSULA DÉCIMA QUARTA (Cessação e Denúncia)
+Qualquer incumprimento contratual grave permite a resolução imediata do contrato. Qualquer das partes pode denunciar o contrato mediante aviso escrito com 15 dias de antecedência.
 
 Lisboa, {{DATA_ASSINATURA}}`,
         signatures: ["REPRESENTANTE_NOME", "NOME_MOTORISTA"]
@@ -108,6 +130,7 @@ Lisboa, {{DATA_ASSINATURA}}`,
             { name: "CC", label: "Cartão de Cidadão / Autorização de Residência / Passaporte", type: "text", required: true, category: "motorista" },
             { name: "VALIDADE_CC", label: "Validade do Documento", type: "date", required: true, category: "motorista" },
             { name: "CERTIFICADO_TVDE", label: "Certificado TVDE", type: "text", required: true, category: "motorista" },
+            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: true, category: "motorista" },
             { name: "MODALIDADE_50_50", label: "Ativar modalidade 50/50 (desativa renda fixa)", type: "checkbox", required: false, category: "financeiro" },
             { name: "VALOR_RENDA", label: "Renda Semanal (€)", type: "number", required: true, category: "financeiro" },
             { name: "VALOR_CAUCAO", label: "Valor da Caução (€)", type: "number", required: true, category: "financeiro" },
@@ -225,7 +248,7 @@ Estado da viatura na entrega:
             { name: "MORADA_MOTORISTA", label: "Morada do Motorista", type: "text", required: true, category: "motorista" },
             { name: "CC", label: "Cartão de Cidadão / Autorização de Residência / Passaporte", type: "text", required: true, category: "motorista" },
             { name: "VALIDADE_CC", label: "Validade do Documento", type: "date", required: true, category: "motorista" },
-            { name: "EMAIL", label: "E-mail do Motorista", type: "email", required: true, category: "motorista" },
+            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: true, category: "motorista" },
             { name: "CERTIFICADO_TVDE", label: "Certificado TVDE", type: "text", required: true, category: "motorista" },
             { name: "DATA_ASSINATURA", label: "Data de Assinatura", type: "date", required: true, default: new Date().toISOString().split('T')[0], category: "geral" }
         ],
@@ -233,7 +256,7 @@ Estado da viatura na entrega:
 
 {{NOME_PROPRIETARIO}}, com sede em {{MORADA_PROPRIETARIO}}, com o número de identificação NIF {{NIF_PROPRIETARIO}}, na qualidade de único proprietário do veículo (o "Proprietário do Veículo") com a marca {{MARCA}}, modelo {{MODELO}}, matrícula {{MATRICULA}}, com data de matrícula {{DATA_MATRICULA}} (o "Veículo"), pela presente declaração autoriza a entidade {{NOME_OPERADORA}}, com sede em {{MORADA_OPERADORA}}, com o número de identificação NIPC {{NIPC_OPERADORA}}, Operadora TVDE registada e devidamente licenciada junto do Instituto da Mobilidade e dos Transportes, I.P. com o n.º de licença {{N_LICENCA}}, válida até {{VALIDADE_LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}} ("Operador TVDE"), a proceder à inscrição e registo do Veículo na plataforma eletrónica UBER, nos termos e para os efeitos do artigo 12.º n.º 1 da Lei n.º 45/2018, de 10 de agosto ("Lei TVDE").
 
-{{NOME_MOTORISTA}}, residente em {{MORADA_MOTORISTA}}, portador do CC n.º {{CC}}, válido até {{VALIDADE_CC}}, com o endereço de e-mail {{EMAIL}}, motorista TVDE, devidamente licenciado junto do IMT com o certificado de motorista n.º {{CERTIFICADO_TVDE}}, declara que tomou conhecimento da presente declaração.
+{{NOME_MOTORISTA}}, residente em {{MORADA_MOTORISTA}}, portador do CC n.º {{CC}}, válido até {{VALIDADE_CC}}, com o endereço de e-mail {{EMAIL_MOTORISTA}}, motorista TVDE, devidamente licenciado junto do IMT com o certificado de motorista n.º {{CERTIFICADO_TVDE}}, declara que tomou conhecimento da presente declaração.
 
 O Motorista declara e garante que, juntamente com o Veículo, cumpre e cumprirá durante o período da presente declaração com todos os requisitos legais e regulamentares aplicáveis, especialmente os previstos na Lei TVDE.`,
         signatures: ["NOME_PROPRIETARIO", "REPRESENTANTE_NOME", "NOME_MOTORISTA"]

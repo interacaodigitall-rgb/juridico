@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ContractTemplate, FormData, FieldCategory } from '../types';
+import { ContractTemplate, FormData, FieldCategory, ContractType } from '../types';
 import { empresaData } from '../constants';
 
 interface ContractFormProps {
@@ -42,6 +42,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
             if (name === 'MODALIDADE_50_50' && checked) {
                 newData['VALOR_RENDA'] = ''; 
             }
+            if (name === 'MODALIDADE_PERCENTAGEM' && checked) {
+                newData['VALOR_TAXA'] = '';
+            }
             return newData;
         });
         
@@ -54,11 +57,12 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
         const newErrors: Record<string, boolean> = {};
         let hasError = false;
         const is5050 = formData.MODALIDADE_50_50 === 'true';
+        const isPercentage = formData.MODALIDADE_PERCENTAGEM === 'true';
 
         template.fields.forEach(field => {
-            if (is5050 && field.name === 'VALOR_RENDA') {
-                return;
-            }
+            if (is5050 && field.name === 'VALOR_RENDA') return;
+            if (isPercentage && field.name === 'VALOR_TAXA') return;
+            
             if (field.required && !formData[field.name]?.trim()) {
                 newErrors[field.name] = true;
                 hasError = true;
@@ -68,9 +72,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
         setErrors(newErrors);
         if (!hasError) {
             const dataToSend = { ...formData };
-            if (is5050) {
-                dataToSend.VALOR_RENDA = 'N/A';
-            }
+            if (is5050) dataToSend.VALOR_RENDA = 'N/A';
+            if (isPercentage) dataToSend.VALOR_TAXA = 'N/A';
             onNext(dataToSend);
         } else {
             alert('⚠️ Por favor, preencha todos os campos obrigatórios marcados com *');
@@ -83,6 +86,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
     }, {} as Record<FieldCategory, typeof template.fields>);
 
     const is5050mode = formData.MODALIDADE_50_50 === 'true';
+    const isPercentageMode = formData.MODALIDADE_PERCENTAGEM === 'true';
 
     return (
         <div className="glass-effect rounded-xl p-8 fade-in">
@@ -97,6 +101,9 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
                             {groupedFields[categoryKey].map(field => {
                                 const isPreFilled = empresaData[field.name] !== undefined;
                                 const hasError = errors[field.name];
+                                const isDisabled = isPreFilled || 
+                                    (field.name === 'VALOR_RENDA' && is5050mode) ||
+                                    (field.name === 'VALOR_TAXA' && isPercentageMode);
 
                                 if (field.type === 'checkbox') {
                                     return (
@@ -119,7 +126,7 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
                                 return (
                                 <div key={field.name}>
                                     <label htmlFor={`field-${field.name}`} className="block text-sm font-semibold text-gray-300 mb-2">
-                                        {field.label} {field.required && <span className="text-red-400">*</span>}
+                                        {field.label} {field.required && !isDisabled && <span className="text-red-400">*</span>}
                                         {isPreFilled && <span className="text-green-400 text-xs ml-2">✓ Pré-preenchido</span>}
                                     </label>
                                     <input
@@ -128,8 +135,8 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
                                         name={field.name}
                                         value={formData[field.name] || ''}
                                         onChange={handleChange}
-                                        disabled={isPreFilled || (field.name === 'VALOR_RENDA' && is5050mode)}
-                                        className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 ${(isPreFilled || (field.name === 'VALOR_RENDA' && is5050mode)) ? 'border-gray-600 text-gray-500 cursor-not-allowed bg-gray-800' : 'border-gray-600'} ${hasError ? 'border-red-500 ring-red-500' : ''}`}
+                                        disabled={isDisabled}
+                                        className={`w-full px-4 py-3 bg-gray-700 border rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 ${isDisabled ? 'border-gray-600 text-gray-500 cursor-not-allowed bg-gray-800' : 'border-gray-600'} ${hasError ? 'border-red-500 ring-red-500' : ''}`}
                                     />
                                 </div>
                                 )

@@ -110,30 +110,6 @@ export const updateContractSignatures = async (
     }
 };
 
-/**
- * Apaga um contrato das sub-coleções do admin e do motorista.
- * @param contractId O ID do contrato a ser apagado.
- * @param adminUid O UID do administrador do contrato.
- * @param driverUid O UID do motorista do contrato.
- */
-export const deleteContract = async (contractId: string, adminUid: string, driverUid: string): Promise<void> => {
-    try {
-        const batch = firestore.batch();
-
-        const adminContractRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
-        const driverContractRef = firestore.collection('users').doc(driverUid).collection('contracts').doc(contractId);
-        
-        batch.delete(adminContractRef);
-        batch.delete(driverContractRef);
-
-        await batch.commit();
-        
-    } catch (error) {
-        console.error('Error deleting contract with batch write:', error);
-        throw new Error('Falha ao apagar o contrato.');
-    }
-};
-
 
 // --- Signature Request Service (for remote signing link, logic remains similar) ---
 // FIX: Convertido para uma função para evitar erros de inicialização.
@@ -269,10 +245,21 @@ export const generateFinalPDF = async (template: ContractTemplate, formData: For
         const fiftyFiftyClause = `A remuneração será partilhada em regime de 50/50% da faturação líquida semanal, após a dedução de todas as taxas das plataformas (Uber, Bolt, etc.) e impostos aplicáveis. As despesas de combustível, portagens e limpeza da viatura são da responsabilidade do Segundo Contraente. Os pagamentos serão efetuados semanalmente por transferência bancária, acompanhados de um extrato detalhado da faturação.`;
         rawContent = rawContent.replace(fixedRentClause, fiftyFiftyClause);
     }
+
+    if (contractType === 'prestacao') {
+        const fixedFeeClauseText = `CLÁUSULA QUINTA (Remuneração)
+A remuneração do Motorista terá como referência a facturação líquida efectivamente obtida com os serviços prestados, deduzidas as taxas das plataformas, impostos aplicáveis e a taxa de utilização da viatura e gestão de frota fixada em {{VALOR_TAXA}} €/semana. Combustível, portagens e limpeza são encargos do Motorista.`;
+        const percentageClauseText = `CLÁUSULA QUINTA (Remuneração)
+A remuneração do Motorista terá como referência a facturação líquida depositada pelas plataformas eletrónicas (Uber, Bolt, etc.) na conta da Primeira Contraente. Sobre este valor incidirá uma taxa de serviço de 4% (quatro por cento) e IVA à taxa legal de 6% (seis por cento), totalizando 10% (dez por cento) que serão retidos pela Primeira Contraente. Combustível, portagens e limpeza são encargos do Motorista.`;
+
+        const remunerationClause = formData.MODALIDADE_PERCENTAGEM === 'true' ? percentageClauseText : fixedFeeClauseText;
+        rawContent = rawContent.replace('{{CLAUSULA_QUINTA_REMUNERACAO}}', remunerationClause);
+    }
     
     Object.entries(allData).forEach(([key, value]) => {
         const regex = new RegExp(`{{${key}}}`, 'g');
          if (contractType === 'aluguer' && formData.MODALIDADE_50_50 === 'true' && key === 'VALOR_RENDA') return;
+         if (contractType === 'prestacao' && formData.MODALIDADE_PERCENTAGEM === 'true' && key === 'VALOR_TAXA') return;
         rawContent = rawContent.replace(regex, value || `[${key}]`);
     });
 

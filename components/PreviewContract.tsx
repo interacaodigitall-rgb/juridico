@@ -19,9 +19,20 @@ const PreviewContract: React.FC<PreviewContractProps> = ({ template, formData, o
         previewContent = previewContent.replace(fixedRentClause, fiftyFiftyClause);
     }
 
+    if (contractType === 'prestacao') {
+        const fixedFeeClauseText = `CLÁUSULA QUINTA (Remuneração)
+A remuneração do Motorista terá como referência a facturação líquida efectivamente obtida com os serviços prestados, deduzidas as taxas das plataformas, impostos aplicáveis e a taxa de utilização da viatura e gestão de frota fixada em {{VALOR_TAXA}} €/semana. Combustível, portagens e limpeza são encargos do Motorista.`;
+        const percentageClauseText = `CLÁUSULA QUINTA (Remuneração)
+A remuneração do Motorista terá como referência a facturação líquida depositada pelas plataformas eletrónicas (Uber, Bolt, etc.) na conta da Primeira Contraente. Sobre este valor incidirá uma taxa de serviço de 4% (quatro por cento) e IVA à taxa legal de 6% (seis por cento), totalizando 10% (dez por cento) que serão retidos pela Primeira Contraente. Combustível, portagens e limpeza são encargos do Motorista.`;
+        
+        const remunerationClause = formData.MODALIDADE_PERCENTAGEM === 'true' ? percentageClauseText : fixedFeeClauseText;
+        previewContent = previewContent.replace('{{CLAUSULA_QUINTA_REMUNERACAO}}', remunerationClause);
+    }
+
     Object.entries(formData).forEach(([key, value]) => {
         const regex = new RegExp(`{{${key}}}`, 'g');
         if (contractType === 'aluguer' && formData.MODALIDADE_50_50 === 'true' && key === 'VALOR_RENDA') return;
+        if (contractType === 'prestacao' && formData.MODALIDADE_PERCENTAGEM === 'true' && key === 'VALOR_TAXA') return;
         previewContent = previewContent.replace(regex, value || `[${key}]`);
     });
     

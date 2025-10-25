@@ -1,4 +1,5 @@
 export enum Step {
+    Dashboard,
     Select,
     Form,
     Preview,
