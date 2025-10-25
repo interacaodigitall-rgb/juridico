@@ -7,8 +7,16 @@ import LoadingSpinner from './components/LoadingSpinner';
 import AdminDashboard from './components/AdminDashboard';
 import RemoteSign from './components/RemoteSign';
 
+const Footer = () => (
+    <footer className="text-center py-4 shrink-0">
+        <p className="text-xs text-gray-500">
+            Copyright © 2025 <a href="https://www.instagram.com/naldo_dicouto/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-400 transition-colors">Dicouto</a>. Todos os direitos reservados.
+        </p>
+    </footer>
+);
+
 const AccessDenied = ({ onLogout }: { onLogout: () => void }) => (
-    <div className="min-h-screen flex flex-col justify-center items-center text-center p-4">
+    <div className="flex-grow flex flex-col justify-center items-center text-center p-4">
         <div className="text-5xl mb-4">🚫</div>
         <h1 className="text-3xl font-bold text-red-400 mb-2">Acesso Negado</h1>
         <p className="text-lg text-gray-300 max-w-md mb-6">A sua conta não tem permissão para aceder a esta plataforma.</p>
@@ -62,28 +70,34 @@ const App: React.FC = () => {
             auth.signOut();
         }
     };
+    
+    const renderContent = () => {
+        if (loadingAuth) {
+            return <LoadingSpinner />;
+        }
+
+        if (!user || !userProfile) {
+            return <Login />;
+        }
+
+        if (userProfile.role === 'admin') {
+            return <AdminDashboard user={user} onLogout={handleLogout} userProfile={userProfile} />;
+        }
+        
+        return <AccessDenied onLogout={handleLogout} />;
+    };
 
     if (isRemoteSignFlow) {
         return <RemoteSign />;
     }
 
-    if (loadingAuth) {
-        return <LoadingSpinner />;
-    }
-
-    if (!user || !userProfile) {
-        return <Login />;
-    }
-    
-    // Renderiza o dashboard apropriado com base no papel do utilizador
     return (
-        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 font-sans">
+        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen text-gray-100 font-sans flex flex-col">
              <style>{`.fade-in { animation: fadeIn 0.5s ease-in-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } } .glass-effect { backdrop-filter: blur(16px) saturate(180%); -webkit-backdrop-filter: blur(16px) saturate(180%); background-color: rgba(31, 41, 55, 0.75); border: 1px solid rgba(255, 255, 255, 0.125); }`}</style>
-            {userProfile.role === 'admin' ? (
-                <AdminDashboard user={user} onLogout={handleLogout} userProfile={userProfile} />
-            ) : (
-                <AccessDenied onLogout={handleLogout} />
-            )}
+            <main className="flex-grow flex flex-col">
+                {renderContent()}
+            </main>
+            <Footer />
         </div>
     );
 };

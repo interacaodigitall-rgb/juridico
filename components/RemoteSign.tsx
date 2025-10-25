@@ -4,6 +4,14 @@ import { SignatureRequest } from '../types';
 import { contractTemplates } from '../constants';
 import LoadingSpinner from './LoadingSpinner';
 
+const Footer = () => (
+    <footer className="text-center py-4 shrink-0">
+        <p className="text-xs text-gray-500">
+            Copyright © 2025 <a href="https://www.instagram.com/naldo_dicouto/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-400 transition-colors">Dicouto</a>. Todos os direitos reservados.
+        </p>
+    </footer>
+);
+
 const RemoteSign: React.FC = () => {
     const [request, setRequest] = useState<SignatureRequest | null>(null);
     const [loading, setLoading] = useState(true);
@@ -156,26 +164,32 @@ const RemoteSign: React.FC = () => {
 
     if (error) {
         return (
-            <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen flex flex-col justify-center items-center text-white p-4 text-center">
-                <div className="text-5xl mb-4">🚫</div>
-                <h1 className="text-3xl font-bold text-red-400 mb-2">Erro</h1>
-                <p className="text-lg text-gray-300 max-w-md">{error}</p>
+            <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen flex flex-col text-white p-4 text-center">
+                <main className="flex-grow flex flex-col justify-center items-center">
+                    <div className="text-5xl mb-4">🚫</div>
+                    <h1 className="text-3xl font-bold text-red-400 mb-2">Erro</h1>
+                    <p className="text-lg text-gray-300 max-w-md">{error}</p>
+                </main>
+                <Footer />
             </div>
         );
     }
     
     if (isSigned) {
         return (
-            <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen flex flex-col justify-center items-center text-white p-4 text-center">
-                <div className="text-5xl mb-4">✅</div>
-                <h1 className="text-3xl font-bold text-green-400 mb-2">Obrigado!</h1>
-                <p className="text-lg text-gray-300">A sua assinatura foi enviada com sucesso. Já pode fechar esta página.</p>
+            <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen flex flex-col text-white p-4 text-center">
+                <main className="flex-grow flex flex-col justify-center items-center">
+                    <div className="text-5xl mb-4">✅</div>
+                    <h1 className="text-3xl font-bold text-green-400 mb-2">Obrigado!</h1>
+                    <p className="text-lg text-gray-300">A sua assinatura foi enviada com sucesso. Já pode fechar esta página.</p>
+                </main>
+                <Footer />
             </div>
         );
     }
 
     return (
-        <div className="bg-gray-900 h-screen text-gray-200 font-sans flex flex-col p-2 sm:p-4 overflow-hidden">
+        <div className="bg-gray-900 min-h-screen text-gray-200 font-sans flex flex-col p-2 sm:p-4 overflow-hidden">
             <div className="text-center mb-4 flex-shrink-0">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-100">
                     Assinatura de Documento
@@ -220,6 +234,7 @@ const RemoteSign: React.FC = () => {
                     </div>
                 </div>
             </div>
+            <Footer />
         </div>
     );
 };
