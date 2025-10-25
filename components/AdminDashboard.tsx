@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Step, ContractType, FormData, Signatures, SavedContract } from '../types';
+import { Step, ContractType, FormData, Signatures, SavedContract, UserProfile } from '../types';
 import { contractTemplates, empresaData } from '../constants';
 import StepIndicator from './StepIndicator';
 import SelectContract from './SelectContract';
@@ -90,7 +90,7 @@ const DashboardHome = ({ onNew, onManage }: { onNew: () => void, onManage: () =>
 );
 
 
-const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, onLogout }) => {
+const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: UserProfile }> = ({ user, onLogout, userProfile }) => {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
     const [step, setStep] = useState<Step>(Step.Dashboard);
     const [completedSteps, setCompletedSteps] = useState<Set<Step>>(new Set([Step.Dashboard, Step.Select, Step.Manage]));
@@ -103,13 +103,13 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
     const [retryPayload, setRetryPayload] = useState<{ signatures: Signatures; action: 'send' | 'finalize' } | null>(null);
 
     const fetchContracts = useCallback(() => {
-        if (!user) {
+        if (!user || !userProfile) {
             setContracts([]);
             return;
         }
         setSyncStatus('syncing');
 
-        loadContracts(user.uid)
+        loadContracts(user.uid, userProfile.role)
             .then(data => {
                 setContracts(data);
                 setSyncStatus('synced');
@@ -118,7 +118,7 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
                 alert(err.message || 'Ocorreu um erro desconhecido ao carregar os contratos.');
                 setSyncStatus('error');
             });
-    }, [user]);
+    }, [user, userProfile]);
 
     useEffect(() => {
         fetchContracts();
@@ -209,7 +209,7 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void }> = ({ user, o
                     alert('⚠️ Aviso! O PDF não foi gerado porque faltam assinaturas. O contrato foi guardado como pendente.');
                 }
             } else {
-                alert('✅ Sucesso! O contrato foi enviado para o portal do motorista e aguarda assinatura.');
+                alert('✅ Sucesso! O contrato foi guardado como pendente no arquivo.');
             }
 
             fetchContracts();

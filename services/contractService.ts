@@ -1,5 +1,4 @@
 
-
 import { jsPDF } from 'jspdf';
 import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest, ContractStatus, UserRole } from '../types';
 import { empresaData } from '../constants';
@@ -19,90 +18,95 @@ declare global {
 // Declara o objeto global do Firebase para que o TypeScript o reconheça
 declare const firebase: any;
 
-// --- Firestore Service (Refactored for a duplicated data model with sync) ---
+// --- Firestore Service (Refactored for a single, top-level collection model) ---
 
 /**
- * Carrega contratos da sub-coleção do utilizador especificado.
- * Esta abordagem é segura e funciona com regras de segurança baseadas no UID.
- * @param uid O ID do utilizador autenticado (admin ou motorista).
- * @returns Uma promessa que resolve para uma lista dos contratos do utilizador.
+ * Carrega contratos do Firestore. Para admins, carrega de ambas as localizações (nova e antiga)
+ * para garantir retrocompatibilidade. Para motoristas, carrega apenas da nova estrutura.
+ * @param uid O ID do utilizador autenticado.
+ * @param role O papel do utilizador ('admin' ou 'driver').
+ * @returns Uma promessa que resolve para uma lista de contratos.
  */
-export const loadContracts = async (uid: string): Promise<SavedContract[]> => {
+export const loadContracts = async (uid: string, role: UserRole): Promise<SavedContract[]> => {
     try {
-        const userContractsRef = firestore.collection('users').doc(uid).collection('contracts');
-        const snapshot = await userContractsRef.get();
+        // Promessa para novos contratos da coleção principal 'contracts'
+        const newContractsPromise = firestore.collection('contracts')
+            .where('participantUids', 'array-contains', uid)
+            .get();
+
+        let allContracts: SavedContract[] = [];
+
+        // Para administradores, também obtém contratos antigos da sua subcoleção de utilizador
+        // para garantir retrocompatibilidade durante a transição de dados.
+        if (role === 'admin') {
+            console.log("Admin detectado, a obter também os contratos antigos...");
+            const legacyContractsPromise = firestore.collection('users').doc(uid).collection('contracts').get();
+            
+            // Aguarda que ambas as consultas terminem
+            const [newSnapshot, legacySnapshot] = await Promise.all([newContractsPromise, legacyContractsPromise]);
+            
+            const newContracts = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+            const legacyContracts = legacySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+            console.log(`Encontrados ${newContracts.length} contratos novos e ${legacyContracts.length} contratos antigos.`);
+
+            // Junta e remove duplicados, dando preferência ao novo formato se houver um conflito de ID.
+            const contractMap = new Map<string, SavedContract>();
+            legacyContracts.forEach(c => contractMap.set(c.id, c));
+            newContracts.forEach(c => contractMap.set(c.id, c)); // Os novos sobrepõem os antigos se os IDs corresponderem
+            allContracts = Array.from(contractMap.values());
+
+        } else { // Para motoristas, obtém apenas da nova e mais eficiente estrutura de coleção.
+            const newSnapshot = await newContractsPromise;
+            allContracts = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+        }
         
-        const contracts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-        
-        contracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return contracts;
+        // Ordena todos os contratos por data de criação, de forma descendente.
+        allContracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        console.log(`Total de contratos carregados: ${allContracts.length}`);
+        return allContracts;
 
     } catch (error: any) {
-        console.error(`Error loading contracts for UID ${uid}:`, error.message);
+        console.error(`Erro ao carregar contratos para o UID ${uid} com papel ${role}:`, error.message);
         if (error.code === 'permission-denied' || error.message.includes('insufficient permissions')) {
-            throw new Error('Erro de permissão. Contacte o administrador para verificar as regras de segurança da base de dados.');
+            throw new Error('Permissões ausentes ou insuficientes para carregar os contratos. Verifique as regras de segurança do Firestore.');
         }
-        throw new Error('Falha ao carregar os seus contratos. Verifique a sua ligação à Internet e tente novamente.');
+        throw new Error('Falha ao carregar contratos. Verifique a sua ligação à Internet e tente novamente.');
     }
 };
 
 /**
- * Guarda um novo contrato, criando cópias duplicadas para o admin e o motorista usando um batch write.
- * @param contractData Os dados do contrato a guardar (deve incluir adminUid e driverUid).
+ * Guarda um novo contrato na coleção principal 'contracts'.
+ * @param contractData Os dados do contrato a guardar.
  * @returns O ID do novo contrato.
  */
 export const saveContract = async (contractData: Omit<SavedContract, 'id'>): Promise<string> => {
     try {
-        const batch = firestore.batch();
-        
-        // Gera um ID único para o contrato
-        const newContractRef = firestore.collection('users').doc().collection('contracts').doc();
-        const newContractId = newContractRef.id;
-
-        const adminContractRef = firestore.collection('users').doc(contractData.adminUid).collection('contracts').doc(newContractId);
-        const driverContractRef = firestore.collection('users').doc(contractData.driverUid).collection('contracts').doc(newContractId);
-        
-        batch.set(adminContractRef, contractData);
-        batch.set(driverContractRef, contractData);
-        
-        await batch.commit();
-        return newContractId;
-
+        const newContractRef = await firestore.collection('contracts').add(contractData);
+        return newContractRef.id;
     } catch (error) {
-        console.error('Error saving contract with batch write:', error);
+        console.error('Error saving contract:', error);
         throw new Error('Falha ao guardar o contrato na nuvem.');
     }
 };
 
+
 /**
- * Atualiza as assinaturas e o estado de um contrato, sincronizando as cópias do admin e do motorista.
+ * Atualiza as assinaturas e o estado de um único documento de contrato.
  * @param contractId O ID do contrato a ser atualizado.
  * @param signatures O objeto de assinaturas atualizado.
  * @param status O novo estado do contrato.
- * @param adminUid O UID do administrador do contrato.
- * @param driverUid O UID do motorista do contrato.
  */
 export const updateContractSignatures = async (
     contractId: string,
     signatures: Signatures,
-    status: ContractStatus,
-    adminUid: string,
-    driverUid: string
+    status: ContractStatus
 ): Promise<void> => {
     try {
-        const batch = firestore.batch();
-        const updateData = { signatures, status };
-
-        const adminContractRef = firestore.collection('users').doc(adminUid).collection('contracts').doc(contractId);
-        const driverContractRef = firestore.collection('users').doc(driverUid).collection('contracts').doc(contractId);
-
-        batch.update(adminContractRef, updateData);
-        batch.update(driverContractRef, updateData);
-
-        await batch.commit();
+        const contractRef = firestore.collection('contracts').doc(contractId);
+        await contractRef.update({ signatures, status });
 
     } catch (error: any) {
-        console.error('Error updating contract signatures with batch write:', error);
+        console.error('Error updating contract signatures:', error);
         if (error.code === 'permission-denied') {
             throw new Error("Permissão negada. Certifique-se de que tem permissão para assinar este contrato.");
         }
@@ -227,7 +231,7 @@ export const updateSignature = async (
 };
 
 
-// --- PDF Generation Service (Refactored for better layout) ---
+// --- PDF Generation Service (Refactored for better layout and reliable download) ---
 
 export const generateFinalPDF = async (template: ContractTemplate, formData: FormData, signatures: Signatures, contractType: ContractType): Promise<{ pdfBlob: Blob, pdfDataUri: string }> => {
     if (!window.jspdf || !window.jspdf.jsPDF) {
@@ -395,11 +399,18 @@ A remuneração do Motorista terá como referência a facturação líquida depo
     doc.setPage(totalPages);
     doc.setTextColor(0, 0, 0); 
     
+    // --- Reliable Download Logic ---
     const pdfBlob = doc.output('blob');
     const pdfDataUri = doc.output('datauristring');
-    
     const fileName = `${template.title.replace(/\s+/g, '_')}_${formData.DATA_ASSINATURA || new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(fileName);
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(pdfBlob);
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
 
     return { pdfBlob, pdfDataUri };
 };

@@ -17,10 +17,10 @@ const DriverDashboard: React.FC<DriverDashboardProps> = ({ user, userProfile, on
 
     const fetchContracts = useCallback(() => {
         setLoading(true);
-        loadContracts(user.uid)
+        loadContracts(user.uid, userProfile.role)
             .then(setContracts)
             .finally(() => setLoading(false));
-    }, [user.uid]);
+    }, [user.uid, userProfile.role]);
 
     useEffect(() => {
         fetchContracts();
@@ -273,9 +273,7 @@ const SignView: React.FC<{ contract: SavedContract; onBack: () => void; }> = ({ 
             await updateContractSignatures(
                 currentContract.id,
                 newSignatures, 
-                isComplete ? 'completed' : 'pending_signature',
-                currentContract.adminUid,
-                currentContract.driverUid
+                isComplete ? 'completed' : 'pending_signature'
             );
             
             const updatedContractState = { ...currentContract, signatures: newSignatures, status: isComplete ? 'completed' : 'pending_signature' } as SavedContract;
