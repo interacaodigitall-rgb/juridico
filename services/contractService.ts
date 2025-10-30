@@ -402,24 +402,6 @@ ${selectedResponsibilities}
         doc.text(textLines, pageWidth / 2, textY, { align: 'center' });
         y = textY + (textLines.length * textLineHeightFactor) + spaceAfterSignature;
     });
-
-
-    // --- Footer and Page Numbering Logic ---
-    const totalPages = (doc.internal as any).pages.length;
-    const currentCompanyData = empresaData;
-
-    for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-        
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-
-        const footerText = `${currentCompanyData.NOME_EMPRESA} | Página ${i} de ${totalPages}`;
-        doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
-    }
-
-    doc.setPage(totalPages);
-    doc.setTextColor(0, 0, 0); 
     
     // --- Reliable Download Logic ---
     const pdfBlob = doc.output('blob');
