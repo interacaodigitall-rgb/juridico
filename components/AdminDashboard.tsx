@@ -13,9 +13,6 @@ import {
     loadContracts,
     saveContract
 } from '../services/contractService';
-import { findUserByEmail } from '../services/authService';
-
-const FIREBASE_PROJECT_ID = 'sistema-juridico-tvde';
 
 const Header = ({ user, onLogout, syncStatus }: { user: any, onLogout: () => void, syncStatus: SyncStatus }) => (
     <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
@@ -34,37 +31,6 @@ const Header = ({ user, onLogout, syncStatus }: { user: any, onLogout: () => voi
         </div>
     </div>
 );
-
-const InstructionModal = ({ email, onClose, onRetry }: { email: string, onClose: () => void, onRetry: () => void }) => {
-    const firebaseProjectUrl = `https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/users`;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 fade-in">
-            <div className="bg-gray-800 rounded-xl w-full max-w-2xl p-6 text-left border border-gray-600 shadow-2xl">
-                <h3 className="text-2xl font-bold text-white mb-4">Ação Necessária: Criar Conta do Motorista</h3>
-                <p className="text-gray-300 mb-4">
-                    A conta para o motorista <strong className="text-blue-400">{email}</strong> não foi encontrada.
-                    Para que o contrato possa ser enviado para o portal, a conta de autenticação do motorista precisa de ser criada primeiro.
-                </p>
-                <div className="space-y-3 text-gray-200 bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                    <p><strong>Passo 1:</strong> Abra a consola do Firebase num novo separador clicando no link abaixo.</p>
-                    <a href={firebaseProjectUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline break-all">
-                        Ir para a página de Autenticação do Firebase →
-                    </a>
-                    <p><strong>Passo 2:</strong> Clique no botão <strong>"Adicionar utilizador"</strong>.</p>
-                    <p><strong>Passo 3:</strong> Preencha o e-mail: <code className="bg-gray-700 p-1 rounded text-yellow-300">{email}</code></p>
-                    <p><strong>Passo 4:</strong> Defina uma palavra-passe temporária (ex: <strong>0123456</strong>) e forneça-a ao motorista.</p>
-                    <p><strong>Passo 5:</strong> Clique em <strong>"Adicionar utilizador"</strong>.</p>
-                    <p className="pt-2 text-sm text-gray-400">Depois disto, o perfil do motorista na base de dados será criado automaticamente quando ele fizer o primeiro login.</p>
-                </div>
-                <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-end">
-                    <button onClick={onClose} className="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white rounded-lg font-semibold transition-all duration-300">Cancelar</button>
-                    <button onClick={onRetry} className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-300">Já Criei a Conta, Tentar Novamente</button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const DashboardHome = ({ onNew, onManage }: { onNew: () => void, onManage: () => void }) => (
     <div className="glass-effect rounded-xl p-8 text-center fade-in">
@@ -98,10 +64,6 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: U
     const [formData, setFormData] = useState<FormData>({});
     const [contracts, setContracts] = useState<SavedContract[]>([]);
     
-    const [isInstructionModalOpen, setIsInstructionModalOpen] = useState(false);
-    const [driverEmailForModal, setDriverEmailForModal] = useState('');
-    const [retryPayload, setRetryPayload] = useState<{ signatures: Signatures; action: 'send' | 'finalize' } | null>(null);
-
     const fetchContracts = useCallback(() => {
         if (!user || !userProfile) {
             setContracts([]);
@@ -109,7 +71,7 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: U
         }
         setSyncStatus('syncing');
 
-        loadContracts(user.uid, userProfile.role)
+        loadContracts(user.uid)
             .then(data => {
                 setContracts(data);
                 setSyncStatus('synced');
@@ -157,27 +119,10 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: U
 
     const handleFinalizeContract = async (signatures: Signatures, action: 'send' | 'finalize') => {
         if (!contractType || !user) return;
-
-        const driverEmail = formData.EMAIL_MOTORISTA;
-        if (!driverEmail) {
-            alert('❌ Erro: O e-mail do motorista é obrigatório e não foi encontrado no formulário.');
-            setSyncStatus('error');
-            return;
-        }
         
         setSyncStatus('syncing');
 
         try {
-            const driverProfile = await findUserByEmail(driverEmail);
-            
-            if (!driverProfile) {
-                setDriverEmailForModal(driverEmail);
-                setRetryPayload({ signatures, action });
-                setIsInstructionModalOpen(true);
-                setSyncStatus('synced');
-                return;
-            }
-            
             const currentTemplate = contractTemplates[contractType];
             const allSignaturesCollected = Object.keys(signatures).length >= currentTemplate.signatures.length;
             
@@ -193,10 +138,7 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: U
                 signatures,
                 createdAt: new Date().toISOString(),
                 adminUid: user.uid,
-                driverUid: driverProfile.uid,
-                driverEmail: driverProfile.email,
                 status: contractStatus,
-                participantUids: [user.uid, driverProfile.uid],
             };
             
             await saveContract(newContract);
@@ -223,13 +165,6 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: U
             setSyncStatus('error');
             console.error(error);
             alert(`❌ Erro: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    };
-
-    const handleRetryFinalize = () => {
-        if (retryPayload) {
-            setIsInstructionModalOpen(false);
-            handleFinalizeContract(retryPayload.signatures, retryPayload.action);
         }
     };
     
@@ -266,13 +201,6 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: U
 
     return (
         <div className="p-4 sm:p-6">
-             {isInstructionModalOpen && (
-                <InstructionModal 
-                    email={driverEmailForModal}
-                    onClose={() => setIsInstructionModalOpen(false)}
-                    onRetry={handleRetryFinalize}
-                />
-            )}
             <div className="container mx-auto px-4 py-6 max-w-7xl">
                 <Header user={user} onLogout={onLogout} syncStatus={syncStatus} />
                 

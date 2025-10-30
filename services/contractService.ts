@@ -1,6 +1,5 @@
-
 import { jsPDF } from 'jspdf';
-import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest, ContractStatus, UserRole } from '../types';
+import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest, ContractStatus } from '../types';
 import { empresaData } from '../constants';
 import { firestore } from '../firebase';
 
@@ -21,44 +20,33 @@ declare const firebase: any;
 // --- Firestore Service (Refactored for a single, top-level collection model) ---
 
 /**
- * Carrega contratos do Firestore. Para admins, carrega de ambas as localizações (nova e antiga)
- * para garantir retrocompatibilidade. Para motoristas, carrega apenas da nova estrutura.
- * @param uid O ID do utilizador autenticado.
- * @param role O papel do utilizador ('admin' ou 'driver').
+ * Carrega contratos do Firestore para o administrador.
+ * Carrega de ambas as localizações (nova e antiga) para garantir retrocompatibilidade.
+ * @param uid O ID do utilizador administrador autenticado.
  * @returns Uma promessa que resolve para uma lista de contratos.
  */
-export const loadContracts = async (uid: string, role: UserRole): Promise<SavedContract[]> => {
+export const loadContracts = async (uid: string): Promise<SavedContract[]> => {
     try {
         // Promessa para novos contratos da coleção principal 'contracts'
         const newContractsPromise = firestore.collection('contracts')
-            .where('participantUids', 'array-contains', uid)
+            .where('adminUid', '==', uid)
             .get();
 
-        let allContracts: SavedContract[] = [];
+        // Promessa para contratos antigos da subcoleção de utilizador do admin
+        const legacyContractsPromise = firestore.collection('users').doc(uid).collection('contracts').get();
+        
+        // Aguarda que ambas as consultas terminem
+        const [newSnapshot, legacySnapshot] = await Promise.all([newContractsPromise, legacyContractsPromise]);
+        
+        const newContracts = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+        const legacyContracts = legacySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
+        console.log(`Encontrados ${newContracts.length} contratos novos e ${legacyContracts.length} contratos antigos.`);
 
-        // Para administradores, também obtém contratos antigos da sua subcoleção de utilizador
-        // para garantir retrocompatibilidade durante a transição de dados.
-        if (role === 'admin') {
-            console.log("Admin detectado, a obter também os contratos antigos...");
-            const legacyContractsPromise = firestore.collection('users').doc(uid).collection('contracts').get();
-            
-            // Aguarda que ambas as consultas terminem
-            const [newSnapshot, legacySnapshot] = await Promise.all([newContractsPromise, legacyContractsPromise]);
-            
-            const newContracts = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-            const legacyContracts = legacySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-            console.log(`Encontrados ${newContracts.length} contratos novos e ${legacyContracts.length} contratos antigos.`);
-
-            // Junta e remove duplicados, dando preferência ao novo formato se houver um conflito de ID.
-            const contractMap = new Map<string, SavedContract>();
-            legacyContracts.forEach(c => contractMap.set(c.id, c));
-            newContracts.forEach(c => contractMap.set(c.id, c)); // Os novos sobrepõem os antigos se os IDs corresponderem
-            allContracts = Array.from(contractMap.values());
-
-        } else { // Para motoristas, obtém apenas da nova e mais eficiente estrutura de coleção.
-            const newSnapshot = await newContractsPromise;
-            allContracts = newSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedContract));
-        }
+        // Junta e remove duplicados, dando preferência ao novo formato se houver um conflito de ID.
+        const contractMap = new Map<string, SavedContract>();
+        legacyContracts.forEach(c => contractMap.set(c.id, c));
+        newContracts.forEach(c => contractMap.set(c.id, c)); // Os novos sobrepõem os antigos se os IDs corresponderem
+        const allContracts = Array.from(contractMap.values());
         
         // Ordena todos os contratos por data de criação, de forma descendente.
         allContracts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -66,7 +54,7 @@ export const loadContracts = async (uid: string, role: UserRole): Promise<SavedC
         return allContracts;
 
     } catch (error: any) {
-        console.error(`Erro ao carregar contratos para o UID ${uid} com papel ${role}:`, error.message);
+        console.error(`Erro ao carregar contratos para o UID ${uid}:`, error.message);
         if (error.code === 'permission-denied' || error.message.includes('insufficient permissions')) {
             throw new Error('Permissões ausentes ou insuficientes para carregar os contratos. Verifique as regras de segurança do Firestore.');
         }
@@ -260,6 +248,31 @@ A remuneração do Motorista terá como referência a facturação líquida depo
         rawContent = rawContent.replace('{{CLAUSULA_QUINTA_REMUNERACAO}}', remunerationClause);
     }
     
+    if (contractType === 'aluguer_parceiro') {
+        const responsibilities = [
+            { key: 'RESP_PROPRIETARIO_SEGURO', text: 'Seguro automóvel obrigatório e restantes coberturas legais;' },
+            { key: 'RESP_PROPRIETARIO_MANUTENCAO', text: 'Manutenção preventiva e corretiva (revisões, peças, pneus, óleo, travões, etc.);' },
+            { key: 'RESP_PROPRIETARIO_DOCUMENTACAO', text: 'IUC, inspeção periódica e toda a documentação legal;' },
+            { key: 'RESP_PROPRIETARIO_COMBUSTIVEL', text: 'Cartão Frota / Combustível;' },
+            { key: 'RESP_PROPRIETARIO_PORTAGENS', text: 'Dispositivo e conta Via Verde, incluindo o pagamento das portagens;' },
+            { key: 'RESP_PROPRIETARIO_OUTROS', text: 'Qualquer outro custo relacionado direta ou indiretamente com a posse da viatura.' }
+        ];
+
+        const selectedResponsibilities = responsibilities
+            .filter(r => formData[r.key] === 'true')
+            .map(r => `- ${r.text}`)
+            .join('\n');
+
+        const responsibilitiesClause = `CLÁUSULA QUARTA — Responsabilidades e Encargos
+
+1. São da responsabilidade EXCLUSIVA da Segunda Contraente (Proprietária):
+${selectedResponsibilities}
+
+2. À Primeira Contraente NÃO cabe qualquer despesa com o veículo, limitando-se ao pagamento da renda semanal acordada.`;
+
+        rawContent = rawContent.replace('{{CLAUSULA_QUARTA_RESPONSABILIDADES}}', responsibilitiesClause);
+    }
+
     Object.entries(allData).forEach(([key, value]) => {
         const regex = new RegExp(`{{${key}}}`, 'g');
          if (contractType === 'aluguer' && formData.MODALIDADE_50_50 === 'true' && key === 'VALOR_RENDA') return;
@@ -328,10 +341,19 @@ A remuneração do Motorista terá como referência a facturação líquida depo
             if (contractType === 'uber') {
                 return `Pelo Operador TVDE:\n${allData.REPRESENTANTE_NOME}`;
             }
+             if (contractType === 'aluguer_proprietario' || contractType === 'aluguer_parceiro') {
+                return `Pela Primeira Contraente (Operadora TVDE):\n${allData.NOME_EMPRESA}\nRepresentada por: ${allData.REPRESENTANTE_NOME}`;
+            }
             return `Pela Primeira Contraente:\n${allData.REPRESENTANTE_NOME}`;
         }
         if (signerName === 'NOME_MOTORISTA') {
             return `Pelo Motorista:\n${allData.NOME_MOTORISTA}`;
+        }
+         if (signerName === 'NOME_ASSINANTE_PROPRIETARIO') {
+            return `Pela Segunda Contraente (Proprietário):\n${allData.NOME_ASSINANTE_PROPRIETARIO}`;
+        }
+        if (signerName === 'GERENTE_PROPRIETARIO_C') {
+            return `Pela Segunda Contraente (Proprietária):\n${allData.NOME_PROPRIETARIO_C}\nRepresentada por: ${allData.GERENTE_PROPRIETARIO_C}`;
         }
         return '';
     };

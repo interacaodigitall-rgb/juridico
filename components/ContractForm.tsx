@@ -17,7 +17,10 @@ const categories: Record<FieldCategory, { title: string }> = {
     motorista: { title: '👤 Dados do Motorista' },
     veiculo: { title: '🚗 Dados do Veículo' },
     financeiro: { title: '💰 Dados Financeiros' },
-    geral: { title: '📅 Informações Gerais' }
+    geral: { title: '📅 Informações Gerais' },
+    proprietario_singular: { title: '👤 Dados do Proprietário (Pessoa Singular)' },
+    proprietario_coletivo: { title: '🏢 Dados do Proprietário (Pessoa Coletiva)' },
+    responsabilidades: { title: '📋 Responsabilidades da Proprietária' },
 };
 
 const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, initialData }) => {
@@ -25,7 +28,12 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
         const fullData: FormData = { ...empresaData, ...initialData };
         template.fields.forEach(field => {
              if(!fullData[field.name]) {
-                fullData[field.name] = (field.default || '').toString();
+                const defaultValue = field.default;
+                if (typeof defaultValue === 'boolean') {
+                    fullData[field.name] = defaultValue.toString();
+                } else {
+                    fullData[field.name] = (defaultValue || '').toString();
+                }
              }
         });
         return fullData;
@@ -107,14 +115,14 @@ const ContractForm: React.FC<ContractFormProps> = ({ template, onBack, onNext, i
 
                                 if (field.type === 'checkbox') {
                                     return (
-                                        <div key={field.name} className="md:col-span-2 flex items-center space-x-3 pt-2">
+                                        <div key={field.name} className="md:col-span-2 flex items-start space-x-3 pt-2">
                                             <input
                                                 type="checkbox"
                                                 id={`field-${field.name}`}
                                                 name={field.name}
                                                 checked={formData[field.name] === 'true'}
                                                 onChange={handleChange}
-                                                className="h-5 w-5 rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 cursor-pointer"
+                                                className="h-5 w-5 mt-1 rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 cursor-pointer flex-shrink-0"
                                             />
                                             <label htmlFor={`field-${field.name}`} className="text-sm font-semibold text-gray-300 cursor-pointer">
                                                 {field.label}

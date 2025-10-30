@@ -220,7 +220,7 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
                     <div className="space-y-4">
                         {signers.map(signer => (
                             <div key={signer} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                <span className="font-semibold text-gray-200">{formData[signer] || signer}</span>
+                                <span className="font-semibold text-gray-200">{formData[signer] || (signer === 'GERENTE_PROPRIETARIO_C' ? formData['GERENTE_PROPRIETARIO_C'] : signer)}</span>
                                 {signatures[signer] ? (
                                     <div className="bg-white rounded p-2">
                                         <img src={signatures[signer]} alt={`Assinatura de ${signer}`} className="h-10" />

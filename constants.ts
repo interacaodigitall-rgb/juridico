@@ -29,7 +29,7 @@ export const contractTemplates: Record<ContractType, ContractTemplate> = {
             { name: "CC", label: "Cartão de Cidadão / Autorização de Residência / Passaporte", type: "text", required: true, category: "motorista" },
             { name: "VALIDADE_CC", label: "Validade do Documento", type: "date", required: true, category: "motorista" },
             { name: "CERTIFICADO_TVDE", label: "Certificado TVDE", type: "text", required: true, category: "motorista" },
-            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: true, category: "motorista" },
+            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: false, category: "motorista" },
             { name: "MARCA", label: "Marca do Veículo", type: "text", required: true, category: "veiculo" },
             { name: "MODELO", label: "Modelo do Veículo", type: "text", required: true, category: "veiculo" },
             { name: "MATRICULA", label: "Matrícula", type: "text", required: true, category: "veiculo" },
@@ -130,7 +130,7 @@ Lisboa, {{DATA_ASSINATURA}}`,
             { name: "CC", label: "Cartão de Cidadão / Autorização de Residência / Passaporte", type: "text", required: true, category: "motorista" },
             { name: "VALIDADE_CC", label: "Validade do Documento", type: "date", required: true, category: "motorista" },
             { name: "CERTIFICADO_TVDE", label: "Certificado TVDE", type: "text", required: true, category: "motorista" },
-            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: true, category: "motorista" },
+            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: false, category: "motorista" },
             { name: "MODALIDADE_50_50", label: "Ativar modalidade 50/50 (desativa renda fixa)", type: "checkbox", required: false, category: "financeiro" },
             { name: "VALOR_RENDA", label: "Renda Semanal (€)", type: "number", required: true, category: "financeiro" },
             { name: "VALOR_CAUCAO", label: "Valor da Caução (€)", type: "number", required: true, category: "financeiro" },
@@ -248,13 +248,13 @@ Estado da viatura na entrega:
             { name: "MORADA_MOTORISTA", label: "Morada do Motorista", type: "text", required: true, category: "motorista" },
             { name: "CC", label: "Cartão de Cidadão / Autorização de Residência / Passaporte", type: "text", required: true, category: "motorista" },
             { name: "VALIDADE_CC", label: "Validade do Documento", type: "date", required: true, category: "motorista" },
-            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: true, category: "motorista" },
+            { name: "EMAIL_MOTORISTA", label: "E-mail do Motorista", type: "email", required: false, category: "motorista" },
             { name: "CERTIFICADO_TVDE", label: "Certificado TVDE", type: "text", required: true, category: "motorista" },
             { name: "DATA_ASSINATURA", label: "Data de Assinatura", type: "date", required: true, default: new Date().toISOString().split('T')[0], category: "geral" }
         ],
         template: `DECLARAÇÃO DE AUTORIZAÇÃO PARA INSCRIÇÃO DE VEÍCULO EM PLATAFORMA UBER
 
-{{NOME_PROPRIETARIO}}, com sede em {{MORADA_PROPRIETARIO}}, com o número de identificação NIF {{NIF_PROPRIETARIO}}, na qualidade de único proprietário do veículo (o "Proprietário do Veículo") com a marca {{MARCA}}, modelo {{MODELO}}, matrícula {{MATRICULA}}, com data de matrícula {{DATA_MATRICULA}} (o "Veículo"), pela presente declaração autoriza a entidade {{NOME_OPERADORA}}, com sede em {{MORADA_OPERADORA}}, com o número de identificação NIPC {{NIPC_OPERADORA}}, Operadora TVDE registada e devidamente licenciada junto do Instituto da Mobilidade e dos Transportes, I.P. com o n.º de licença {{N_LICENCA}}, válida até {{VALIDADE_LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}} ("Operador TVDE"), a proceder à inscrição e registo do Veículo na plataforma eletrónica UBER, nos termos e para os efeitos do artigo 12.º n.º 1 da Lei n.º 45/2018, de 10 de agosto ("Lei TVDE").
+{{NOME_PROPRIETARIO}}, com sede em {{MORADA_PROPRIETario}}, com o número de identificação NIF {{NIF_PROPRIETario}}, na qualidade de único proprietário do veículo (o "Proprietário do Veículo") com a marca {{MARCA}}, modelo {{MODELO}}, matrícula {{MATRICULA}}, com data de matrícula {{DATA_MATRICULA}} (o "Veículo"), pela presente declaração autoriza a entidade {{NOME_OPERADORA}}, com sede em {{MORADA_OPERADORA}}, com o número de identificação NIPC {{NIPC_OPERADORA}}, Operadora TVDE registada e devidamente licenciada junto do Instituto da Mobilidade e dos Transportes, I.P. com o n.º de licença {{N_LICENCA}}, válida até {{VALIDADE_LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}} ("Operador TVDE"), a proceder à inscrição e registo do Veículo na plataforma eletrónica UBER, nos termos e para os efeitos do artigo 12.º n.º 1 da Lei n.º 45/2018, de 10 de agosto ("Lei TVDE").
 
 {{NOME_MOTORISTA}}, residente em {{MORADA_MOTORISTA}}, portador do CC n.º {{CC}}, válido até {{VALIDADE_CC}}, com o endereço de e-mail {{EMAIL_MOTORISTA}}, motorista TVDE, devidamente licenciado junto do IMT com o certificado de motorista n.º {{CERTIFICADO_TVDE}}, declara que tomou conhecimento da presente declaração.
 
@@ -288,5 +288,207 @@ Condições de devolução
 O Veículo deve ser devolvido no estado em que foi entregue.
 O prazo do presente contrato é de {{PRAZO_CONTRATO}} a contar da data da assinatura do mesmo, não sendo em caso algum prorrogável.`,
         signatures: ["NOME_PROPRIETARIO", "REPRESENTANTE_NOME"]
+    },
+    aluguer_proprietario: {
+        title: "Contrato de Aluguer de Viatura de Proprietário",
+        fields: [
+            { name: "REPRESENTANTE_CC", label: "Nº CC do Gerente da Operadora", type: "text", required: true, category: "empresa" },
+            { name: "TIPO_PROPRIETARIO", label: "Tipo de Proprietário (Pessoa Singular / Pessoa Coletiva)", type: "text", required: true, category: "geral" },
+            { name: "NOME_PROPRIETARIO_S", label: "Nome Completo (Prop. Singular)", type: "text", required: false, category: "proprietario_singular" },
+            { name: "MORADA_PROPRIETARIO_S", label: "Morada (Prop. Singular)", type: "text", required: false, category: "proprietario_singular" },
+            { name: "CC_PROPRIETARIO_S", label: "Nº CC (Prop. Singular)", type: "text", required: false, category: "proprietario_singular" },
+            { name: "NIF_PROPRIETARIO_S", label: "NIF (Prop. Singular)", type: "text", required: false, category: "proprietario_singular" },
+            { name: "RAZAO_SOCIAL_PROPRIETARIO_C", label: "Razão Social (Prop. Coletiva)", type: "text", required: false, category: "proprietario_coletivo" },
+            { name: "NIPC_PROPRIETARIO_C", label: "NIPC (Prop. Coletiva)", type: "text", required: false, category: "proprietario_coletivo" },
+            { name: "SEDE_PROPRIETARIO_C", label: "Sede (Prop. Coletiva)", type: "text", required: false, category: "proprietario_coletivo" },
+            { name: "REPRESENTANTE_PROPRIETARIO_C", label: "Nome do Gerente (Prop. Coletiva)", type: "text", required: false, category: "proprietario_coletivo" },
+            { name: "CC_REPRESENTANTE_PROPRIETARIO_C", label: "Nº CC do Gerente (Prop. Coletiva)", type: "text", required: false, category: "proprietario_coletivo" },
+            { name: "NIF_REPRESENTANTE_PROPRIETARIO_C", label: "NIF do Gerente (Prop. Coletiva)", type: "text", required: false, category: "proprietario_coletivo" },
+            { name: "NOME_ASSINANTE_PROPRIETARIO", label: "Nome do Assinante (Proprietário)", type: "text", required: true, category: "geral" },
+            { name: "MARCA", label: "Marca do Veículo", type: "text", required: true, category: "veiculo" },
+            { name: "MODELO", label: "Modelo do Veículo", type: "text", required: true, category: "veiculo" },
+            { name: "MATRICULA", label: "Matrícula", type: "text", required: true, category: "veiculo" },
+            { name: "DUA", label: "Nº DUA", type: "text", required: true, category: "veiculo" },
+            { name: "APOLICE_E_VALIDADE", label: "Nº Apólice de Seguro e Validade", type: "text", required: true, category: "veiculo" },
+            { name: "DURACAO_CONTRATO", label: "Duração do Contrato", type: "text", required: true, category: "financeiro", default: "6 meses" },
+            { name: "LOCAL_ASSINATURA", label: "Local de Assinatura", type: "text", required: true, category: "geral", default: "Lisboa" },
+            { name: "DATA_ASSINATURA", label: "Data de Assinatura", type: "date", required: true, default: new Date().toISOString().split('T')[0], category: "geral" }
+        ],
+        template: `CONTRATO DE ALUGUER DE VIATURA PARA FINS TVDE
+
+Entre:
+
+1. {{NOME_EMPRESA}}, pessoa coletiva n.º {{NIPC_EMPRESA}}, com sede em {{MORADA_EMPRESA}}, doravante designada “Primeira Contraente” ou “Operadora TVDE”, representada por:
+
+Gerente: {{REPRESENTANTE_NOME}}
+Cartão de Cidadão n.º {{REPRESENTANTE_CC}}
+NIF: {{REPRESENTANTE_NIF}}
+
+E
+
+2. PROPRIETÁRIO DA VIATURA, sendo ({{TIPO_PROPRIETARIO}}):
+
+( ) Pessoa Singular
+Nome Completo: {{NOME_PROPRIETARIO_S}}
+Morada: {{MORADA_PROPRIETARIO_S}}
+Cartão de Cidadão n.º {{CC_PROPRIETARIO_S}}
+NIF: {{NIF_PROPRIETARIO_S}}
+
+( ) Pessoa Coletiva / Empresa
+Razão Social: {{RAZAO_SOCIAL_PROPRIETARIO_C}}
+NIPC: {{NIPC_PROPRIETARIO_C}}
+Sede: {{SEDE_PROPRIETARIO_C}}
+
+Representada por:
+Nome do Gerente / Administrador: {{REPRESENTANTE_PROPRIETARIO_C}}
+Cartão de Cidadão n.º {{CC_REPRESENTANTE_PROPRIETARIO_C}}
+NIF: {{NIF_REPRESENTANTE_PROPRIETARIO_C}}
+
+(Doravante designado “Segunda Contraente” ou “Proprietário”).
+
+CLÁUSULA PRIMEIRA
+(Objeto)
+O Proprietário dá de aluguer à Operadora TVDE a viatura identificada na Cláusula Segunda, para utilização exclusiva em atividade TVDE, sendo a gestão operacional, escalas, afetação a motoristas e exploração económica realizadas exclusivamente pela Operadora.
+
+CLÁUSULA SEGUNDA
+(Identificação da Viatura)
+Marca: {{MARCA}}
+Modelo / Versão: {{MODELO}}
+Matrícula: {{MATRICULA}}
+N.º Documento Único Automóvel: {{DUA}}
+N.º Apólice de Seguro e Validade: {{APOLICE_E_VALIDADE}}
+
+Será realizado:
+Auto de Entrega na data do início
+Auto de Devolução no termo do contrato
+
+CLÁUSULA TERCEIRA
+(Valor do Aluguer)
+A Operadora compromete-se a pagar ao Proprietário o valor de 180€ (cento e oitenta euros) semanais, pagos antecipadamente até segunda-feira de cada semana.
+
+CLÁUSULA QUARTA
+(Despesas e Responsabilidades)
+
+Ficam a cargo do Proprietário:
+- Seguro automóvel obrigatório e demais coberturas legalmente necessárias;
+- Manutenção mecânica, revisões, pneus, IUC, inspeções e eventuais reparações por desgaste normal.
+
+Ficam a cargo da Operadora:
+- Cartão Frota (combustível);
+- Via Verde (portagens);
+- Higienização recorrente;
+- Seleção e gestão dos motoristas utilizadores.
+
+CLÁUSULA QUINTA
+(Estado e Conservação da Viatura)
+A Operadora obriga-se a zelar pela viatura e comunicar qualquer avaria ou dano.
+Em caso de acidente culposo por motorista, a Operadora suporta franquias e danos não cobertos pelo seguro.
+Danos provenientes de falhas de manutenção são responsabilidade do Proprietário.
+
+CLÁUSULA SEXTA
+(Proibição de Terceira Afetação)
+A viatura não pode ser utilizada pelo Proprietário ou qualquer terceiro sem autorização escrita da Operadora enquanto vigorar o presente contrato.
+
+CLÁUSULA SÉTIMA
+(Duração e Denúncia)
+O contrato tem duração inicial de {{DURACAO_CONTRATO}}, renovando-se automaticamente por iguais períodos, podendo qualquer das partes denunciá-lo com 15 dias de antecedência, sem penalização.
+
+CLÁUSULA OITAVA
+(Foro)
+Para resolução de litígios, é competente o Tribunal da Comarca de Lisboa, com renúncia expressa a qualquer outro.
+
+Assinam:
+{{LOCAL_ASSINATURA}}, {{DATA_ASSINATURA}}
+
+Primeira Contraente (Operadora TVDE)
+{{NOME_EMPRESA}}
+
+Segunda Contraente (Proprietário)
+{{NOME_ASSINANTE_PROPRIETARIO}}
+`,
+        signatures: ["REPRESENTANTE_NOME", "NOME_ASSINANTE_PROPRIETARIO"]
+    },
+    aluguer_parceiro: {
+        title: "Contrato de Aluguer de Viatura (Parceiro)",
+        fields: [
+            { name: "NOME_PROPRIETARIO_C", label: "Nome da Empresa Proprietária", type: "text", required: true, category: "proprietario_coletivo" },
+            { name: "NIPC_PROPRIETARIO_C", label: "NIPC da Proprietária", type: "text", required: true, category: "proprietario_coletivo" },
+            { name: "TIPO_SOCIEDADE_PROPRIETARIO_C", label: "Tipo de Sociedade", type: "text", required: true, category: "proprietario_coletivo", default: "sociedade por quotas" },
+            { name: "SEDE_PROPRIETARIO_C", label: "Sede da Proprietária", type: "text", required: true, category: "proprietario_coletivo" },
+            { name: "GERENTE_PROPRIETARIO_C", label: "Nome do Gerente da Proprietária", type: "text", required: true, category: "proprietario_coletivo" },
+            { name: "NIF_GERENTE_PROPRIETARIO_C", label: "NIF do Gerente da Proprietária", type: "text", required: true, category: "proprietario_coletivo" },
+            { name: "MARCA", label: "Marca do Veículo", type: "text", required: true, category: "veiculo" },
+            { name: "MODELO", label: "Modelo / Versão", type: "text", required: true, category: "veiculo" },
+            { name: "ANO_VEICULO", label: "Ano do Veículo", type: "number", required: true, category: "veiculo" },
+            { name: "MATRICULA", label: "Matrícula", type: "text", required: true, category: "veiculo" },
+            { name: "DUA", label: "Nº DUA", type: "text", required: true, category: "veiculo" },
+            { name: "APOLICE", label: "Nº Apólice de Seguro", type: "text", required: true, category: "veiculo" },
+            { name: "VALIDADE_SEGURO", label: "Validade do Seguro", type: "date", required: true, category: "veiculo" },
+            { name: "VALOR_RENDA_SEMANAL", label: "Valor da Renda Semanal (€)", type: "number", required: true, category: "financeiro", default: 180 },
+            { name: "VALOR_RENDA_EXTENSO", label: "Valor da Renda por Extenso", type: "text", required: true, category: "financeiro", default: "cento e oitenta euros" },
+            { name: "RESP_PROPRIETARIO_SEGURO", label: "Seguro automóvel obrigatório e restantes coberturas legais", type: "checkbox", required: false, category: "responsabilidades", default: true },
+            { name: "RESP_PROPRIETARIO_MANUTENCAO", label: "Manutenção preventiva e corretiva (revisões, peças, pneus, etc.)", type: "checkbox", required: false, category: "responsabilidades", default: true },
+            { name: "RESP_PROPRIETARIO_DOCUMENTACAO", label: "IUC, inspeção periódica e toda a documentação legal", type: "checkbox", required: false, category: "responsabilidades", default: true },
+            { name: "RESP_PROPRIETARIO_COMBUSTIVEL", label: "Cartão Frota / Combustível", type: "checkbox", required: false, category: "responsabilidades", default: true },
+            { name: "RESP_PROPRIETARIO_PORTAGENS", label: "Dispositivo e conta Via Verde, incluindo o pagamento das portagens", type: "checkbox", required: false, category: "responsabilidades", default: true },
+            { name: "RESP_PROPRIETARIO_OUTROS", label: "Qualquer outro custo relacionado direta ou indiretamente com a posse da viatura", type: "checkbox", required: false, category: "responsabilidades", default: true },
+            { name: "DURACAO_CONTRATO", label: "Duração do Contrato", type: "text", required: true, category: "geral", default: "6 meses" },
+            { name: "LOCAL_ASSINATURA", label: "Local de Assinatura", type: "text", required: true, category: "geral", default: "Lisboa" },
+            { name: "DATA_ASSINATURA", label: "Data de Assinatura", type: "date", required: true, default: new Date().toISOString().split('T')[0], category: "geral" }
+        ],
+        template: `CONTRATO DE ALUGUER DE VIATURA PARA FINS TVDE
+
+ENTRE:
+
+{{NOME_EMPRESA}}, pessoa coletiva n.º {{NIPC_EMPRESA}}, com sede em {{MORADA_EMPRESA}}, doravante designada “Primeira Contraente” ou “Operadora TVDE”, representada pelo seu {{REPRESENTANTE_CARGO}}:
+
+{{REPRESENTANTE_NOME}}, residente na mesma morada da sede, NIF {{REPRESENTANTE_NIF}}.
+
+E
+
+{{NOME_PROPRIETARIO_C}}, pessoa coletiva n.º {{NIPC_PROPRIETARIO_C}}, {{TIPO_SOCIEDADE_PROPRIETARIO_C}}, com sede em {{SEDE_PROPRIETARIO_C}}, doravante designada “Segunda Contraente” ou “Proprietária”, representada por:
+
+Gerente: {{GERENTE_PROPRIETARIO_C}}
+NIF: {{NIF_GERENTE_PROPRIETARIO_C}}.
+
+CLÁUSULA PRIMEIRA — Objeto
+A Segunda Contraente aluga à Primeira Contraente a viatura identificada na Cláusula Segunda, para ser utilizada exclusivamente em atividade de transporte TVDE, sob gestão operacional da Primeira Contraente.
+
+CLÁUSULA SEGUNDA — Identificação da Viatura
+Marca: {{MARCA}}
+Modelo / Versão: {{MODELO}}
+Ano: {{ANO_VEICULO}}
+Matrícula: {{MATRICULA}}
+N.º DUA: {{DUA}}
+N.º da Apólice de Seguro: {{APOLICE}}
+Validade do Seguro: {{VALIDADE_SEGURO}}
+
+Será elaborado Auto de Entrega e, no termo, Auto de Devolução.
+
+CLÁUSULA TERCEIRA — Valor do Aluguer
+A Primeira Contraente pagará à Segunda Contraente o valor de:
+
+{{VALOR_RENDA_SEMANAL}}€ ({{VALOR_RENDA_EXTENSO}}) por semana,
+pagos antecipadamente até segunda-feira de cada semana.
+
+{{CLAUSULA_QUARTA_RESPONSABILIDADES}}
+
+CLÁUSULA QUINTA — Conservação e Danos
+A Primeira Contraente obriga-se a utilizar a viatura de forma diligente.
+Em acidente com culpa do motorista, a Primeira Contraente suporta franquia ou danos não cobertos pelo seguro.
+Se o dano resultar de falta de manutenção, a responsabilidade é da Segunda Contraente.
+
+CLÁUSULA SEXTA — Exclusividade
+A viatura é afeta exclusivamente ao serviço TVDE sob gestão da Primeira Contraente, não podendo ser desviada, retirada ou cedida a terceiros sem acordo escrito.
+
+CLÁUSULA SÉTIMA — Duração e Denúncia
+O contrato vigora por {{DURACAO_CONTRATO}}, renovando-se automaticamente por iguais períodos.
+Qualquer das partes pode denunciá-lo com 15 dias de aviso prévio, por escrito.
+
+CLÁUSULA OITAVA — Foro
+Para resolução de litígios, é competente o Tribunal Judicial da Comarca de Lisboa.
+
+{{LOCAL_ASSINATURA}}, {{DATA_ASSINATURA}}`,
+        signatures: ["REPRESENTANTE_NOME", "GERENTE_PROPRIETARIO_C"]
     }
 };

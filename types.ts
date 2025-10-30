@@ -7,9 +7,9 @@ export enum Step {
     Manage,
 }
 
-export type ContractType = 'prestacao' | 'aluguer' | 'uber' | 'comodato';
+export type ContractType = 'prestacao' | 'aluguer' | 'uber' | 'comodato' | 'aluguer_proprietario' | 'aluguer_parceiro';
 
-export type FieldCategory = 'empresa' | 'motorista' | 'financeiro' | 'veiculo' | 'proprietario' | 'operadora' | 'operador' | 'geral';
+export type FieldCategory = 'empresa' | 'motorista' | 'financeiro' | 'veiculo' | 'proprietario' | 'operadora' | 'operador' | 'geral' | 'proprietario_singular' | 'proprietario_coletivo' | 'responsabilidades';
 
 export interface ContractField {
     name: string;
@@ -17,7 +17,7 @@ export interface ContractField {
     type: string;
     required: boolean;
     category: FieldCategory;
-    default?: string | number;
+    default?: string | number | boolean;
 }
 
 export interface ContractTemplate {
@@ -41,10 +41,7 @@ export interface SavedContract {
     signatures: Signatures;
     createdAt: string; // ISO String
     adminUid: string;
-    driverUid: string;
-    driverEmail: string;
     status: ContractStatus;
-    participantUids: string[];
 }
 
 export interface SignatureRequest {

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { SavedContract, ContractType } from '../types';
 import { generateFinalPDF } from '../services/contractService';
@@ -43,6 +42,8 @@ const ManageContracts: React.FC<ManageContractsProps> = ({ contracts, onEdit, on
         aluguer: "Aluguer de Viatura",
         uber: "Autorizações Uber",
         comodato: "Comodato Bolt",
+        aluguer_proprietario: "Aluguer de Viatura (de Proprietário)",
+        aluguer_parceiro: "Aluguer de Viatura (Parceiro)",
     };
 
     const contractTypeIcons: Record<ContractType, string> = {
@@ -50,6 +51,8 @@ const ManageContracts: React.FC<ManageContractsProps> = ({ contracts, onEdit, on
         aluguer: '🚗',
         uber: '📱',
         comodato: '🤝',
+        aluguer_proprietario: '🏢',
+        aluguer_parceiro: '🤝',
     };
     
     const orderedContractTypes = Object.keys(groupedContracts).sort((a,b) => a.localeCompare(b)) as ContractType[];
@@ -132,7 +135,7 @@ const ManageContracts: React.FC<ManageContractsProps> = ({ contracts, onEdit, on
                                         Criado em: {new Date(contract.createdAt).toLocaleDateString('pt-PT', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                     </p>
                                     <p className="text-sm text-gray-300">
-                                       <span className="font-semibold text-gray-400">Motorista:</span> {contract.data.NOME_MOTORISTA || contract.data.NOME_OPERADOR || 'N/A'}
+                                       <span className="font-semibold text-gray-400">Motorista/Parceiro:</span> {contract.data.NOME_MOTORISTA || contract.data.NOME_PROPRIETARIO_C || contract.data.NOME_OPERADOR || 'N/A'}
                                     </p>
                                     <p className="text-sm text-gray-300">
                                        <span className="font-semibold text-gray-400">Matrícula:</span> {contract.data.MATRICULA || 'N/A'}

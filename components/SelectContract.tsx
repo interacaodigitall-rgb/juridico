@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ContractType } from '../types';
 
@@ -12,6 +11,8 @@ const contractOptions = [
     { type: 'aluguer' as ContractType, icon: '🚗', title: 'Aluguer de Viatura', desc: 'Contrato de aluguer com auto de entrega detalhado e caução.', tag: 'Locação Veicular', tagColor: 'purple' },
     { type: 'uber' as ContractType, icon: '📱', title: 'Autorização Uber', desc: 'Declaração tripartida para inscrição na plataforma Uber.', tag: 'Plataforma Digital', tagColor: 'green' },
     { type: 'comodato' as ContractType, icon: '🤝', title: 'Comodato Bolt', desc: 'Contrato de comodato para plataforma eletrónica Bolt.', tag: 'Plataforma Bolt', tagColor: 'yellow' },
+    { type: 'aluguer_proprietario' as ContractType, icon: '🏢', title: 'Aluguer (de Proprietário)', desc: 'Contrato de aluguer de viatura de um proprietário para a operadora.', tag: 'Gestão de Frota', tagColor: 'red' },
+    { type: 'aluguer_parceiro' as ContractType, icon: '🤝', title: 'Aluguer (Parceiro)', desc: 'Contrato de aluguer de viatura de uma empresa parceira para a operadora.', tag: 'Parceria de Frota', tagColor: 'indigo' },
 ];
 
 const tagColors: Record<string, string> = {
@@ -19,13 +20,15 @@ const tagColors: Record<string, string> = {
     purple: 'bg-purple-600/20 text-purple-400',
     green: 'bg-green-600/20 text-green-400',
     yellow: 'bg-yellow-600/20 text-yellow-400',
+    red: 'bg-red-600/20 text-red-400',
+    indigo: 'bg-indigo-600/20 text-indigo-400',
 }
 
 const SelectContract: React.FC<SelectContractProps> = ({ onSelect, onBackToDashboard }) => {
     return (
         <div className="glass-effect rounded-xl p-8 fade-in">
             <h2 className="text-3xl font-bold text-center mb-8 text-gray-100">Selecione o Tipo de Contrato</h2>
-            <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {contractOptions.map((contract) => (
                     <div
                         key={contract.type}
