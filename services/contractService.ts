@@ -277,7 +277,7 @@ ${selectedResponsibilities}
         const regex = new RegExp(`{{${key}}}`, 'g');
          if (contractType === 'aluguer' && formData.MODALIDADE_50_50 === 'true' && key === 'VALOR_RENDA') return;
          if (contractType === 'prestacao' && formData.MODALIDADE_PERCENTAGEM === 'true' && key === 'VALOR_TAXA') return;
-        rawContent = rawContent.replace(regex, value || `[${key}]`);
+        rawContent = rawContent.replace(regex, value || '');
     });
 
     const contentLines = rawContent.split('\n');

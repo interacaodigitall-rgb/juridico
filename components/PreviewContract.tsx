@@ -59,7 +59,7 @@ ${selectedResponsibilities || '(Nenhuma responsabilidade selecionada)'}
         const regex = new RegExp(`{{${key}}}`, 'g');
         if (contractType === 'aluguer' && formData.MODALIDADE_50_50 === 'true' && key === 'VALOR_RENDA') return;
         if (contractType === 'prestacao' && formData.MODALIDADE_PERCENTAGEM === 'true' && key === 'VALOR_TAXA') return;
-        previewContent = previewContent.replace(regex, value || `[${key}]`);
+        previewContent = previewContent.replace(regex, value || '');
     });
     
     const formattedContent = previewContent.replace(/\n/g, '<br />');

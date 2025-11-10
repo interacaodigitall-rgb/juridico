@@ -264,29 +264,46 @@ O Motorista declara e garante que, juntamente com o Veículo, cumpre e cumprirá
     comodato: {
         title: "Contrato de Comodato para Plataforma Bolt",
         fields: [
-            { name: "NOME_PROPRIETARIO", label: "Nome do Proprietário do Veículo", type: "text", required: true, category: "proprietario" },
-            { name: "MORADA_PROPRIETARIO", label: "Morada do Proprietário", type: "text", required: true, category: "proprietario" },
-            { name: "NIF_PROPRIETARIO", label: "NIF do Proprietário", type: "text", required: true, category: "proprietario" },
+            { name: "NOME_PROPRIETARIO", label: "Nome / Razão Social do Proprietário (Comodante)", type: "text", required: true, category: "proprietario" },
+            { name: "MORADA_PROPRIETARIO", label: "Morada / Sede do Proprietário (Comodante)", type: "text", required: true, category: "proprietario" },
+            { name: "NIF_PROPRIETARIO", label: "NIF / NIPC do Proprietário (Comodante)", type: "text", required: true, category: "proprietario" },
+            { name: "CC_PROPRIETARIO", label: "Nº CC / BI do Proprietário (se pessoa singular)", type: "text", required: false, category: "proprietario" },
+            { name: "VALIDADE_CC_PROPRIETARIO", label: "Validade do Documento (se pessoa singular)", type: "date", required: false, category: "proprietario" },
             { name: "MARCA", label: "Marca do Veículo", type: "text", required: true, category: "veiculo" },
             { name: "MODELO", label: "Modelo do Veículo", type: "text", required: true, category: "veiculo" },
             { name: "MATRICULA", label: "Matrícula", type: "text", required: true, category: "veiculo" },
             { name: "DATA_MATRICULA", label: "Data de Matrícula", type: "date", required: true, category: "veiculo" },
             { name: "PRAZO_CONTRATO", label: "Prazo do Contrato", type: "text", required: true, category: "geral", default: "1 ano" },
-            { name: "DATA_ASSINATURA_PROPRIETARIO", label: "Data Assinatura Proprietário", type: "date", required: true, default: new Date().toISOString().split('T')[0], category: "geral" },
-            { name: "DATA_ASSINATURA_OPERADOR", label: "Data Assinatura Operador", type: "date", required: true, default: new Date().toISOString().split('T')[0], category: "geral" }
+            { name: "DATA_ASSINATURA", label: "Data de Assinatura", type: "date", required: true, default: new Date().toISOString().split('T')[0], category: "geral" }
         ],
         template: `CONTRATO DE COMODATO PARA PLATAFORMA ELETRÓNICA TVDE
 
-1. Comodante – proprietário do bem emprestado
-{{NOME_PROPRIETARIO}}, com sede em {{MORADA_PROPRIETARIO}}, com o número de identificação NIF {{NIF_PROPRIETARIO}}, na qualidade de Contratante e proprietário do veículo (o "Proprietário do Veículo") com a marca {{MARCA}}, modelo {{MODELO}}, matrícula {{MATRICULA}}, com data de matrícula {{DATA_MATRICULA}} (o "Veículo"), doravante designado por Objeto, que deverá ser utilizado para o trabalho de Transporte Individual e Remunerado de Passageiros em Veículos Descaracterizados a partir de Plataforma Electrónica – TVDE, pela presente declaração autoriza a entidade Comodatário.
-Durante o período do contrato, o 1.º Contratante compromete-se a manter o seguro do veículo válido.
+Entre:
 
-2. Comodatário – entidade que usufrui do bem emprestado
-{{NOME_OPERADOR}}, com sede em {{MORADA_OPERADOR}}, com o número de matrícula e NIPC {{NIPC_OPERADOR}}, Operadora TVDE registada e devidamente licenciada junto do IMT com o n.º de licença {{N_LICENCA}}, válida até {{VALIDADE_LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}}, a proceder à inscrição e registo do Veículo na plataforma eletrónica Bolt, nos termos e para os efeitos do artigo 12.º n.º 1 da Lei n.º 45/2018, de 10 de agosto ("Lei TVDE").
+PRIMEIRO OUTORGANTE (Comodante):
+{{NOME_PROPRIETARIO}}, com domicílio/sede em {{MORADA_PROPRIETARIO}}, NIF/NIPC {{NIF_PROPRIETARIO}}, titular do Bilhete de Identidade/Cartão de Cidadão n.º {{CC_PROPRIETARIO}} (válido até {{VALIDADE_CC_PROPRIETARIO}}), na qualidade de proprietário e legítimo possuidor do veículo infra identificado.
 
-Condições de devolução
-O Veículo deve ser devolvido no estado em que foi entregue.
-O prazo do presente contrato é de {{PRAZO_CONTRATO}} a contar da data da assinatura do mesmo, não sendo em caso algum prorrogável.`,
+E
+
+SEGUNDO OUTORGANTE (Comodatário):
+{{NOME_OPERADOR}}, com sede em {{MORADA_OPERADOR}}, com o número de matrícula e NIPC {{NIPC_OPERADOR}}, Operadora TVDE registada e devidamente licenciada junto do IMT com o n.º de licença {{N_LICENCA}}, válida até {{VALIDADE_LICENCA_TVDE}}, aqui representada pelo seu {{REPRESENTANTE_CARGO}} {{REPRESENTANTE_NOME}}.
+
+É celebrado o presente Contrato de Comodato, que se rege pelas seguintes cláusulas:
+
+CLÁUSULA 1ª (Objeto e Finalidade)
+O Primeiro Outorgante é o proprietário e legítimo possuidor do veículo da marca {{MARCA}}, modelo {{MODELO}}, com matrícula {{MATRICULA}}, com data de matrícula {{DATA_MATRICULA}} (adiante designado por "Objeto"), que pelo presente cede em regime de comodato ao Segundo Outorgante.
+O Objeto deve ser usado para o trabalho de transporte individual e remunerado de passageiros em veículos descaracterizados a partir de plataforma eletrónica - TVDE.
+
+CLÁUSULA 2ª (Obrigações)
+Durante a vigência do contrato, o Primeiro Outorgante (Comodante) compromete-se a manter o seguro do veículo válido.
+
+CLÁUSULA 3ª (Prazo)
+O prazo deste contrato é de {{PRAZO_CONTRATO}} a contar da data de assinatura e não se prorroga em nenhuma circunstância.
+
+CLÁUSULA 4ª (Condições de Devolução)
+No termo do contrato, o Segundo Outorgante deve devolver o Objeto ao Primeiro Outorgante exatamente nas condições em que o recebeu.
+
+Lisboa, {{DATA_ASSINATURA}}`,
         signatures: ["NOME_PROPRIETARIO", "REPRESENTANTE_NOME"]
     },
     aluguer_proprietario: {
