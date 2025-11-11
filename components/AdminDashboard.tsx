@@ -126,10 +126,8 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: U
             const currentTemplate = contractTemplates[contractType];
             const allSignaturesCollected = Object.keys(signatures).length >= currentTemplate.signatures.length;
             
-            let contractStatus: SavedContract['status'] = 'pending_signature';
-            if (action === 'finalize' && allSignaturesCollected) {
-                contractStatus = 'completed';
-            }
+            // O estado do contrato é 'completed' se, e apenas se, todas as assinaturas forem recolhidas.
+            const contractStatus: SavedContract['status'] = allSignaturesCollected ? 'completed' : 'pending_signature';
 
             const newContract: Omit<SavedContract, 'id'> = {
                 type: contractType,
@@ -144,14 +142,14 @@ const AdminDashboard: React.FC<{ user: any, onLogout: () => void, userProfile: U
             await saveContract(newContract);
             
             if (action === 'finalize') {
+                await generateFinalPDF(currentTemplate, newContract.data, signatures, contractType);
                 if (allSignaturesCollected) {
-                    await generateFinalPDF(currentTemplate, newContract.data, signatures, contractType);
                     alert('🎉 Sucesso! Contrato assinado, PDF gerado e arquivado.');
                 } else {
-                    alert('⚠️ Aviso! O PDF não foi gerado porque faltam assinaturas. O contrato foi guardado como pendente.');
+                    alert('✅ Sucesso! PDF gerado com as assinaturas disponíveis. O contrato foi guardado e permanece pendente.');
                 }
             } else {
-                alert('✅ Sucesso! O contrato foi guardado como pendente no arquivo.');
+                alert('✅ Sucesso! O contrato foi guardado no arquivo.');
             }
 
             fetchContracts();

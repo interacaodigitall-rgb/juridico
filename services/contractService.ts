@@ -1,3 +1,5 @@
+
+
 import { jsPDF } from 'jspdf';
 import { SavedContract, ContractTemplate, FormData, Signatures, ContractType, SignatureRequest, ContractStatus } from '../types';
 import { empresaData } from '../constants';
@@ -285,8 +287,10 @@ ${selectedResponsibilities}
     const body = contentLines.slice(contentLines.indexOf(title) + 1).join('\n');
 
     // Use a single, consistent config for readability
-    const config = contractType === 'uber' 
+    const config = contractType === 'uber'
         ? { fontSize: 9.8, lineHeight: 4.8, margin: 20, yStart: 25 }
+        : contractType === 'comodato'
+        ? { fontSize: 9.5, lineHeight: 4.5, margin: 20, yStart: 25 }
         : { fontSize: 11, lineHeight: 5.5, margin: 20, yStart: 25 };
 
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
@@ -319,7 +323,7 @@ ${selectedResponsibilities}
     // --- Reworked Signature Placement Logic ---
     const signatureWidth = 60;
     const signatureHeight = 20;
-    const spaceBeforeSignatures = 10;
+    const spaceBeforeSignatures = contractType === 'comodato' ? 3 : 10;
     const signerNameFontSize = contractType === 'uber' ? 8 : 8.5;
     const textLineHeightFactor = contractType === 'uber' ? 3.0 : 3.5;
     const spaceAfterSignature = contractType === 'uber' ? 5 : 7;
@@ -395,8 +399,6 @@ ${selectedResponsibilities}
                 doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight, 'S');
                 doc.text('Erro na Imagem', centeredSignatureX + 5, y + 15);
             }
-        } else {
-             doc.rect(centeredSignatureX, y, signatureWidth, signatureHeight, 'S');
         }
 
         doc.text(textLines, pageWidth / 2, textY, { align: 'center' });

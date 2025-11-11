@@ -26,7 +26,6 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
     const [isDrawing, setIsDrawing] = useState(false);
 
     const signers = template.signatures;
-    const allLocalSignaturesCollected = Object.keys(signatures).length >= signers.length;
 
     useEffect(() => {
         if (!signatureRequestId) return;
@@ -243,7 +242,7 @@ const SignContract: React.FC<SignContractProps> = ({ template, formData, contrac
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                             <span>Guardar Progresso</span>
                         </button>
-                         <button onClick={() => onFinalize(signatures, 'finalize')} disabled={!allLocalSignaturesCollected} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:from-gray-600 disabled:to-gray-700">
+                         <button onClick={() => onFinalize(signatures, 'finalize')} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold flex items-center justify-center space-x-2 transition-all duration-300">
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                             <span>Gerar PDF Final</span>
                         </button>
